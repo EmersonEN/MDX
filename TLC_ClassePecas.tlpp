@@ -1,0 +1,346 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.Peca
+using namespace Telecontrol.Classe
+
+class TTLCPeca from TTLCAPICadastro
+
+	public method CallApi() as logical
+	public method New() as object
+
+    // criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Cadastra() as logical
+	public method Consulta() as logical
+
+endclass
+
+
+method New() as object class TTLCPeca
+local aVerbos := {'POST', 'PUT', 'GET'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+local cArqSHOW as character
+local cDados as character
+
+	_Super:New('pecas', 'SB1')
+	::cDescricao := "Cadastro de Peças"
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := aVerbos[iVerbo]
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + cVerbo + '.json'
+
+		if (upper(cVerbo) == 'POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para o cadastro da Peça
+			cDados := '{' + CRLF
+			cDados += '	"referencia": "{|| ALLTRIM(SB1->B1_COD)}",' + CRLF
+			cDados += '	"descricao": "{|| ALLTRIM(SB1->B1_DESC)}",' + CRLF
+			cDados += '	"origem": "{|| if(alltrim(SB1->B1_ORIGEM)$'+"'/0/3/4/5/8/'"+', '+"'NAC'"+', '+"'IMP'"+')}",' + CRLF
+			cDados += '	"ipi": "{|| SB1->B1_IPI}",' + CRLF
+			cDados += '	"acessorio": "{|| .F.}",' + CRLF
+			cDados += '	"itemAparencia": "{|| .F.}",' + CRLF
+			cDados += '	"ativo": "{|| SB1->B1_ATIVO <> ' + "'N'" + '}",' + CRLF
+			cDados += '	"multiplo": "{|| 1}",' + CRLF
+
+			cDados += '	"devolucaoObrigatoria": "{|| .F.}",' + CRLF
+			cDados += '	"garantiaDiferenciada": "{|| 6}",' + CRLF // ?????
+			cDados += '	"bloqueadaGarantia": "{|| .F.}",' + CRLF
+
+			cDados += '	"bloqueadaVenda": "{|| SB1->B1_MSBLQL == ' + "'1'" + '}",' + CRLF
+			cDados += '	"estoque": "{|| if(SB2->B2_COD == SB1->B1_COD,SaldoSB2(),0)}",' + CRLF
+			cDados += '	"unidade": "{|| SB1->B1_UM}",' + CRLF
+			cDados += '	"moPeca": "{|| 1.5}",' + CRLF
+			cDados += '	"produtoAcabado": "{|| SB1->B1_TIPO == '+"'PA'"+'}",' + CRLF
+			cDados += '	"numeroSeriePeca": "{|| .F.}",' + CRLF
+			cDados += '	"peso": "{|| SB1->B1_PESO}",' + CRLF
+			cDados += '	"classificacaoFiscal": "{|| ALLTRIM(SB1->B1_CLASFIS)}",' + CRLF
+			cDados += '	"returnID": "' + "{|| cValToChar(objRetorno['peca'])}" + '"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'PUT') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para alteração da Peça
+			cDados := '{' + CRLF
+			cDados += '	"descricao": "{|| ALLTRIM(SB1->B1_DESC)}",' + CRLF
+			cDados += '	"origem": "{|| if(alltrim(SB1->B1_ORIGEM)$'+"'/0/3/4/5/8/'"+', '+"'NAC'"+', '+"'IMP'"+')}",' + CRLF
+			cDados += '	"ipi": "{|| SB1->B1_IPI}",' + CRLF
+			cDados += '	"acessorio": "{|| .F.}",' + CRLF
+			cDados += '	"itemAparencia": "{|| .F.}",' + CRLF
+			cDados += '	"ativo": "{|| SB1->B1_ATIVO <> ' + "'N'" + '}",' + CRLF
+			cDados += '	"multiplo": "{|| 1}",' + CRLF
+
+			cDados += '	"devolucaoObrigatoria": "{|| .F.}",' + CRLF
+			cDados += '	"garantiaDiferenciada": "{|| 6}",' + CRLF // ???????
+			cDados += '	"bloqueadaGarantia": "{|| .F.}",' + CRLF
+
+			cDados += '	"bloqueadaVenda": "{|| SB1->B1_MSBLQL == ' + "'1'" + '}",' + CRLF
+			cDados += '	"estoque": "{|| if(SB2->B2_COD==SB1->B1_COD,SaldoSB2(),0)}",' + CRLF
+			cDados += '	"unidade": "{|| SB1->B1_UM}",' + CRLF
+	//		cDados += '	"moPeca": "{|| 80.55}",' + CRLF
+			cDados += '	"produtoAcabado": "{|| SB1->B1_TIPO == '+"'PA'"+'}",' + CRLF
+			cDados += '	"numeroSeriePeca": "{|| .F.}",' + CRLF
+			cDados += '	"peso": "{|| SB1->B1_PESO}",' + CRLF
+			cDados += '	"classificacaoFiscal": "{|| ALLTRIM(SB1->B1_CLASFIS)}"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'GET') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta da Peça
+			MemoWrite(cArqCFG, '{}')
+		endif
+	next iVerbo
+
+	// se necessário cria o arquivo para ser usado na consulta da peça
+	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
+
+	if !File(cArqSHOW)
+		cDados := '{' + CRLF
+		cDados += '	"referencia": {' + CRLF
+		cDados += '		"referencia": "B1_COD"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"descricao": {' + CRLF
+		cDados += '		"referencia": "B1_DESC"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"origem": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Origem'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Origem da peça'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 3}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ipi": {' + CRLF
+		cDados += '		"referencia": "B1_IPI"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"acessorio": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Acessório'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se a peça é um acessório'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"itemAparencia": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Aparência'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se a peça é um item de aparência'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ativo": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Ativo'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Produto ativo'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"multiplo": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Múltiplo'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Multiplicidade da peça'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 3}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"devolucaoObrigatoria": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Devol.Obrig.'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se é a devolução da peça é obrigatória'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"garantiaDiferenciada": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Gar.Adicional'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Garantia adicional da peça'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 3}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"bloqueadaGarantia": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Gar.Bloqueada'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se a peça pode ser lançada como garantia'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"bloqueadaVenda": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Venda Bloqueada'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se a peça está bloqueada para venda'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"estoque": {' + CRLF
+		cDados += '		"referencia": "B2_QATU"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"unidade": {' + CRLF
+		cDados += '		"referencia": "B1_UM"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"produtoAcabado": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Prod. Acabado'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se a peça corresponde a um produto de troca'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"numeroSeriePeca": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Informa N.Série'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Indica se o número de série deve ser informado na OS'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"peso": {' + CRLF
+		cDados += '		"referencia": "B1_PESO"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"classificacaoFiscal": {' + CRLF
+		cDados += '		"referencia": "B1_CLASFIS"' + CRLF
+		cDados += '	}' + CRLF
+		cDados += '}' + CRLF
+		MemoWrite(cArqSHOW, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character) as logical class TTLCPeca
+local lRet := .F. as logical
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta)
+
+return lRet
+
+method Cadastra(xRegistro as variant, cCodRet as character) as logical class TTLCPeca
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaSB1 := SB1->(GetArea()) as array
+local AreaSB2 := SB2->(GetArea()) as array
+local AreaSB5 := SB5->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Peca.TTLCPeca.Cadastra'
+
+	if empty(xRegistro)
+		lRet := chkFile('SB1')
+	else
+		if valtype(xRegistro) == "C" .AND. SB1->B1_COD <> xRegistro // chave
+			SB1->(dbSetOrder(1))
+			lRet := SB1->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. SB1->(Recno()) <> xRegistro // registro
+			SB1->(dbGoTo(xRegistro))
+			lRet := (SB1->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet // se conseguiu posicionar no registro correto
+		if SB2->B2_COD <> SB1->B1_COD // ALMOXARIFADO ????
+			SB2->(dbSetOrder(1)) // B2_FILIAL, B2_COD, B2_LOCAL
+			SB2->(dbSeek(xFilial() + SB1->B1_COD))
+		endif
+		if SB5->B5_COD <> SB1->B1_COD
+			SB5->(dbSetOrder(1)) // B5_FILIAL, B5_COD
+			SB5->(dbSeek(xFilial() + SB1->B1_COD))
+		endif
+
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('post', @cCodRet, @cRetorno)
+	else
+		// LOG
+		if !IsBlind()
+			FWAlertError('Peça não encontrada no Protheus', 'Cadastrar peça no Telecontrol')
+		endif
+	endif
+
+	SB1->(RestArea(AreaSB1))
+	SB2->(RestArea(AreaSB2))
+	SB5->(RestArea(AreaSB5))
+
+return lRet
+
+
+method Consulta(cCodigo as character, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg as logical) as logical class TTLCPeca
+local lRet := .F. as logical
+local AreaSB1 := SB1->(GetArea()) as array
+local AreaSB2 := SB2->(GetArea()) as array
+local AreaSB5 := SB5->(GetArea()) as array
+
+default cCodigo := (::cTabela)->B1_COD
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	::oLOG:cClasse := 'Peca.TTLCPeca.Consulta'
+
+	cRetorno := ''
+
+	if !empty(cCodigo)
+		(::cTabela)->(dbSetOrder(1)) // B1_FILIAL + B1_COD
+		lRet := (::cTabela)->(dbSeek(xFilial() + cCodigo))
+
+		if lRet // se conseguiu posicionar no registro correto
+			::nRegistro := (::cTabela)->(Recno())
+			::oLOG:nRegistro := (::cTabela)->(Recno())
+			lRet := _Super:Consulta(cCodigo, @cCodRet, @cRetorno, lMostraMsg, lMostraReg)
+		else
+			// LOG
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Peça não encontrada no Protheus', 'Consultar peça no Telecontrol')
+			endif
+		endif
+
+	else
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Para efetuar a consulta é necessário informar o código da peça Protheus', 'Consultar peça no Telecontrol')
+		endif
+	endif
+
+	SB5->(RestArea(AreaSB5))
+	SB2->(RestArea(AreaSB2))
+	SB1->(RestArea(AreaSB1))
+
+return lRet
+
+
+user function testepec(tipo)//Telecontrol.Integracao.Peca.u_testepec(1)
+local oAPIPeca := TTLCPeca():New()
+local lRet := .F.
+local cRetorno as character
+default tipo = 1
+
+	chkFile('SB1')
+
+	if tipo == 1
+		lRet := oAPIPeca:Cadastra()
+	else
+		lRet := oAPIPeca:Consulta(,,@cRetorno,,.T.)
+	endif
+
+	if lRet
+		if tipo == 1
+			alert('tudo certo')
+		else
+//			Alert(varinfo('Retorno', cRetorno))
+			Alert(cRetorno)
+		endif
+	else
+		alert('deu pau!')
+	endif
+
+return

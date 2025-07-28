@@ -1,0 +1,427 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.Posto
+using namespace Telecontrol.Classe
+
+class TTLCPosto from TTLCAPICadastro
+
+	public method CallApi() as logical
+	public method New() as object
+
+    // criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Cadastra() as logical
+	public method Altera() as logical
+	public method Consulta() as logical
+
+endclass
+
+
+method New() as object class TTLCPosto
+local aVerbos := {'POST', 'PUT', 'GET'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+local cArqSHOW as character
+local cDados as character
+
+	_Super:New('postos', 'SA2')
+	::cDescricao := "Cadastro de Postos"
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := aVerbos[iVerbo]
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + cVerbo + '.json'
+
+		if (upper(cVerbo) == 'POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para o cadastro de um posto
+			cDados := '{' + CRLF
+			cDados += '	"cnpj": "{|| ALLTRIM(SA2->A2_CGC)}",' + CRLF
+			cDados += '	"razao": "{|| ALLTRIM(SA2->A2_NOME)}",' + CRLF
+			cDados += '	"nomeFantasia": "{|| ALLTRIM(SA2->A2_NREDUZ)}",' + CRLF
+			cDados += '	"codigoPosto": "{|| ALLTRIM(SA2->(A2_COD+A2_LOJA))}",' + CRLF
+			cDados += '	"endereco": "{|| ALLTRIM(SA2->A2_END)}",' + CRLF
+			cDados += '	"complemento": "{|| ALLTRIM(SA2->A2_ENDCOMP)}",' + CRLF
+			cDados += '	"numero": "{|| if(empty(SA2->A2_NR_END),'+"'0'"+',ALLTRIM(SA2->A2_NR_END))}",' + CRLF
+			cDados += '	"bairro": "{|| ALLTRIM(SA2->A2_BAIRRO)}",' + CRLF
+			cDados += '	"cep": "{|| ALLTRIM(SA2->A2_CEP)}",' + CRLF
+			cDados += '	"cidade": "{|| ALLTRIM(SA2->A2_MUN)}",' + CRLF
+			cDados += '	"estado": "{|| ALLTRIM(SA2->A2_EST)}",' + CRLF
+			cDados += '	"ie": "{|| ALLTRIM(SA2->A2_INSCR)}",' + CRLF
+			cDados += '	"suframa": "{|| !empty(SA2->A2_CODMUN)}",' + CRLF
+			cDados += '	"pais": "{|| '+"'BR'"+'}",' + CRLF
+			cDados += '	"email": "{|| ALLTRIM(SA2->A2_EMAIL)}",' + CRLF
+			cDados += '	"fax": "{|| ALLTRIM(SA2->A2_FAX)}",' + CRLF
+			cDados += '	"contato": "{|| ALLTRIM(SA2->A2_REPRES)}",' + CRLF
+			cDados += '	"fone": "{|| ALLTRIM(SA2->A2_TEL)}",' + CRLF
+			cDados += '	"tipoPosto": "{|| ALLTRIM(SA2->A2_TPOSTO)}",' + CRLF
+			cDados += '	"credenciamento": "{|| ALLTRIM(X3COMBO('+"'A2_STCRED'"+', SA2->A2_STCRED))}",' + CRLF
+
+			// gestão telecontrol -----------------------------
+			cDados += '	"pedidoFaturado": "{|| .F.}",' + CRLF
+			cDados += '	"pedidoGarantia": "{|| .T.}",' + CRLF
+			cDados += '	"controlaEstoque": "{|| .F.}",' + CRLF
+			cDados += '	"desconto": "{|| 13.5}",' + CRLF
+			cDados += '	"valorKm": "{|| 5.0}",' + CRLF
+			// ------------------------------------------------
+
+			cDados += '	"favorecidoDoc": "{|| ALLTRIM(SA2->A2_CGC)}",' + CRLF
+			cDados += '	"favorecidoNome": "{|| ALLTRIM(SA2->A2_NOME)}",' + CRLF
+			cDados += '	"tipoConta": "{|| ALLTRIM(X3COMBO('+"'A2_TIPCTA'"+', SA2->A2_TIPCTA))}",' + CRLF
+			cDados += '	"banco": "{|| ALLTRIM(SA2->A2_BANCO)}",' + CRLF
+			cDados += '	"agencia": "{|| ALLTRIM(SA2->A2_AGENCIA)}",' + CRLF
+			cDados += '	"conta": "{|| ALLTRIM(SA2->A2_NUMCON)}",' + CRLF
+			cDados += '	"contribuinteIcms": "{|| '+"ALLTRIM(SA2->A2_CONTRIB)=='1'"+'}",' + CRLF
+			cDados += '	"optanteSimplesNacional": "{|| '+"ALLTRIM(SA2->A2_SIMPNAC)=='1'"+'}",' + CRLF
+
+			// gestão telecontrol -----------------------------
+			cDados += '	"digitaOSRevenda": "{|| .T.}",' + CRLF
+			cDados += '	"garantiaComDeslocamento": "{|| .T.}",' + CRLF
+			cDados += '	"divulgarConsumidor": "{|| .T.}",' + CRLF
+			cDados += '	"digitaOS": "{|| .T.}",' + CRLF
+			cDados += '	"linhasAtende": "{|| nil}",' + CRLF
+			cDados += '	"abre_start_up": "{|| .F.}",' + CRLF
+			// ------------------------------------------------
+
+	//		cDados += '	"codigoColigada": "",' + CRLF
+	//		cDados += '	"nomeColigada": "",' + CRLF
+	//		cDados += '	"codigoTabelaGarantia": "GAR",' + CRLF
+	//		cDados += '	"codigoTabelaVenda": "VEN",' + CRLF
+
+			cDados += '	"returnID": "'+"{|| cValTochar('posto')}"+'"'+ CRLF
+			cDados += '}' + CRLF
+
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'PUT') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para alteração do posto
+			cDados := '{' + CRLF
+			cDados += '	"razao": "{|| ALLTRIM(SA2->A2_NOME)}",' + CRLF
+			cDados += '	"nomeFantasia": "{|| ALLTRIM(SA2->A2_NREDUZ)}",' + CRLF
+			cDados += '	"codigoPosto": "{|| ALLTRIM(SA2->(A2_COD+A2_LOJA))}",' + CRLF
+			cDados += '	"endereco": "{|| ALLTRIM(SA2->A2_END)}",' + CRLF
+			cDados += '	"complemento": "{|| ALLTRIM(SA2->A2_ENDCOMP)}",' + CRLF
+			cDados += '	"numero": "{|| if(empty(SA2->A2_NR_END),'+"'0'"+',ALLTRIM(SA2->A2_NR_END))}",' + CRLF
+			cDados += '	"bairro": "{|| ALLTRIM(SA2->A2_BAIRRO)}",' + CRLF
+			cDados += '	"cep": "{|| ALLTRIM(SA2->A2_CEP)}",' + CRLF
+			cDados += '	"cidade": "{|| ALLTRIM(SA2->A2_MUN)}",' + CRLF
+			cDados += '	"estado": "{|| ALLTRIM(SA2->A2_EST)}",' + CRLF
+			cDados += '	"ie": "{|| ALLTRIM(SA2->A2_INSCR)}",' + CRLF
+			cDados += '	"suframa": "{|| !empty(SA2->A2_CODMUN)}",' + CRLF
+			cDados += '	"pais": "{|| '+"'BR'"+'}",' + CRLF
+			cDados += '	"email": "{|| ALLTRIM(SA2->A2_EMAIL)}",' + CRLF
+			cDados += '	"fax": "{|| ALLTRIM(SA2->A2_FAX)}",' + CRLF
+			cDados += '	"contato": "{|| ALLTRIM(SA2->A2_REPRES)}",' + CRLF
+			cDados += '	"fone": "{|| ALLTRIM(SA2->A2_TEL)}",' + CRLF
+			cDados += '	"tipoPosto": "{|| ALLTRIM(SA2->A2_TPOSTO)}",' + CRLF
+			cDados += '	"credenciamento": "{|| ALLTRIM(X3COMBO('+"'A2_STCRED'"+', SA2->A2_STCRED))}",' + CRLF
+			cDados += '	"favorecidoDoc": "{|| ALLTRIM(SA2->A2_CGC)}",' + CRLF
+			cDados += '	"favorecidoNome": "{|| ALLTRIM(SA2->A2_NOME)}",' + CRLF
+			cDados += '	"tipoConta": "{|| ALLTRIM(X3COMBO('+"'A2_TIPCTA'"+', SA2->A2_TIPCTA))}",' + CRLF
+			cDados += '	"banco": "{|| ALLTRIM(SA2->A2_BANCO)}",' + CRLF
+			cDados += '	"agencia": "{|| ALLTRIM(SA2->A2_AGENCIA)}",' + CRLF
+			cDados += '	"conta": "{|| ALLTRIM(SA2->A2_NUMCON)}",' + CRLF
+			cDados += '	"contribuinteIcms": "{|| '+"ALLTRIM(SA2->A2_CONTRIB)=='1'"+'}",' + CRLF
+			cDados += '	"optanteSimplesNacional": "{|| '+"ALLTRIM(SA2->A2_SIMPNAC)=='1'"+'}"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'GET') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta do posto
+			MemoWrite(cArqCFG, '{}')
+		endif
+	next iVerbo
+
+	// se necessário cria o arquivo para ser usado na consulta do posto
+	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
+
+	if !File(cArqSHOW)
+		cDados := '{' + CRLF
+		cDados += '	"tipo_posto": {' + CRLF
+		cDados += '		"tag": "descricao",' + CRLF
+		cDados += '		"titulo": "{|| '+"'Tipo Posto'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Tipo do posto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 20}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"codigo_posto": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Código'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Código do posto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 8}",' + CRLF // campo A2_COD + A2_LOJA 
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"cnpj": {' + CRLF
+		cDados += '		"referencia": "A2_CGC"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"razao": {' + CRLF
+		cDados += '		"referencia": "A2_NOME"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"nome_fantasia": {' + CRLF
+		cDados += '		"referencia": "A2_NREDUZ"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_email": {' + CRLF
+		cDados += '		"referencia": "A2_EMAIL"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_fone_comercial": {' + CRLF
+		cDados += '		"referencia": "A2_TEL"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_fax": {' + CRLF
+		cDados += '		"referencia": "A2_FAX"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_nome": {' + CRLF
+		cDados += '		"referencia": "A2_REPRES"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_endereco": {' + CRLF
+		cDados += '		"referencia": "A2_END"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_numero": {' + CRLF
+		cDados += '		"referencia": "A2_NR_END"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_complemento": {' + CRLF
+		cDados += '		"referencia": "A2_ENDCOMP"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_bairro": {' + CRLF
+		cDados += '		"referencia": "A2_BAIRRO"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_cep": {' + CRLF
+		cDados += '		"referencia": "A2_CEP"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_cidade": {' + CRLF
+		cDados += '		"referencia": "A2_MUN"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"contato_estado": {' + CRLF
+		cDados += '		"referencia": "A2_EST"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"credenciamento": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Status do Posto'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Status do posto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 20}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"banco": {' + CRLF
+		cDados += '		"referencia": "A2_BANCO"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"nome_banco": {' + CRLF
+		cDados += '		"referencia": "A6_NOME"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"agencia": {' + CRLF
+		cDados += '		"referencia": "A2_AGENCIA"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"conta": {' + CRLF
+		cDados += '		"referencia": "A2_NUMCON"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"tipo_conta": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Tipo Conta'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Tipo da conta'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 25}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"cpf_conta": {' + CRLF
+		cDados += '		"referencia": "A2_CGC"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"favorecido_conta": {' + CRLF
+		cDados += '		"referencia": "A2_NOME"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"pedido_faturado": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Pedido Faturado'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Controla a permissão do posto gerar pedidos faturados'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"pedido_garantia": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Pedido Garantia'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Controla a permissão do posto gerar pedidos de garantia'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"desconto": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Desconto Posto'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Percentual de desconto do posto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"valor_km": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Valor Km'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Valor pago ao posto por KM deslocado'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"posto": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'ID Telecontrol'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'ID do posto no Telecontrol'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	}' + CRLF
+		cDados += '}' + CRLF
+		MemoWrite(cArqSHOW, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character) as logical class TTLCPosto
+local lRet := .F. as logical
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta)
+
+return lRet
+
+method Cadastra(xRegistro as variant, cCodRet as character) as logical class TTLCPosto
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaSA2 := SA2->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Posto.TTLCPosto.Cadastra'
+
+	if empty(xRegistro)
+		lRet := chkFile('SA2')
+	else
+		if valtype(xRegistro) == "C" .AND. SA2->(A2_COD+A2_LOJA) <> xRegistro // chave
+			SA2->(dbSetOrder(1))
+			lRet := SA2->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. SA2->(Recno()) <> xRegistro // registro
+			SA2->(dbGoTo(xRegistro))
+			lRet := (SA2->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet .AND. !empty(SA2->A2_TPOSTO) // se conseguiu posicionar no registro correto
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('post', @cCodRet, @cRetorno)
+	else
+		// LOG
+		if !IsBlind()
+			FWAlertError('Fornecedor/Posto não encontrado no Protheus', 'Cadastrar posto no Telecontrol')
+		endif
+	endif
+
+	SA2->(RestArea(AreaSA2))
+
+return lRet
+
+
+method Altera(xRegistro as variant, cCodRet as character) as logical class TTLCPosto
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaSA2 := SA2->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Posto.TTLCPosto.Altera'
+
+	if empty(xRegistro)
+		lRet := chkFile('SA2')
+	else
+		if valtype(xRegistro) == "C" .AND. SA2->(A2_COD + A2_LOJA) <> xRegistro // chave
+			SA2->(dbSetOrder(1))
+			lRet := SA2->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. SA2->(Recno()) <> xRegistro // registro
+			SA2->(dbGoTo(xRegistro))
+			lRet := (SA2->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet // se conseguiu posicionar no registro correto
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, SA2->A2_CGC)
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Fornecedor/Posto não encontrado no Protheus', 'Consulta cliente no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaSA2)
+
+return lRet
+
+
+method Consulta(cCodigo as character, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg as logical) as logical class TTLCPosto
+local lRet := .F. as logical
+
+default cCodigo := alltrim((::cTabela)->(A2_COD + A2_LOJA))
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	::oLOG:cClasse := 'Posto.TTLCPosto.Consulta'
+
+	cRetorno := ''
+
+	if !empty(cCodigo)
+		(::cTabela)->(dbSetOrder(1)) // A2_FILIAL + A2_COD + A2_LOJA
+		lRet := (::cTabela)->(dbSeek(xFilial() + cCodigo))
+
+		if lRet .AND. !empty(SA2->A2_TPOSTO)// se conseguiu posicionar no registro correto
+			::nRegistro := (::cTabela)->(Recno())
+			::oLOG:nRegistro := (::cTabela)->(Recno())
+			lRet := _Super:Consulta(SA2->A2_CGC, @cCodRet, @cRetorno, lMostraMsg, lMostraReg)
+		else
+			// LOG
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Fornecedor/Posto não encontrado no Protheus', 'Consultar posto no Telecontrol')
+			endif
+		endif
+
+	else
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Para efetuar a consulta é necessário informar o código do fornecedor/posto Protheus', 'Consultar posto no Telecontrol')
+		endif
+	endif
+
+return lRet
+
+
+user function testepr(tipo)//Telecontrol.Integracao.Posto.u_testepr(1)
+local oAPIPosto := TTLCPosto():New()
+local lRet := .F.
+local cRetorno as character
+default tipo = 1
+
+	chkFile('SA2')
+
+	if tipo == 1
+		lRet := oAPIPosto:Cadastra()
+	else
+		lRet := oAPIPosto:Consulta(,,@cRetorno,,.T.)
+	endif
+
+	if lRet
+		if tipo == 1
+			alert('tudo certo')
+		else
+//			Alert(varinfo('Retorno', cRetorno))
+			Alert(cRetorno)
+		endif
+	else
+		alert('deu pau!')
+	endif
+
+return

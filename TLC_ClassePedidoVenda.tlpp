@@ -1,0 +1,597 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.PedidoVenda
+using namespace Telecontrol.Classe
+
+class TTLCPedidoVenda from TTLCAPICadastro
+
+	public data cDescricao as character
+
+	private data jCfgImportacao as json
+
+	public method CallApi() as logical
+	public method New() as object
+
+	// criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Consulta() as logical
+	public method Importa() as logical
+	public method ImportaPedidosVenda() as logical
+	public method AvisoDeImportacaoDePedidoVenda() as logical
+
+endclass
+
+
+method New() as object class TTLCPedidoVenda
+local aVerbos := {'PUT', 'GET', 'IMPORTA', 'POST'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+//local cArqSHOW as character
+local cDados as character
+local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as character
+//local cTabPrf := if(left(cTabelaPedidoVenda,1)=="S",right(cTabelaPedidoVenda,2),cTabelaPedidoVenda) as character
+
+	_Super:New('pedidovenda', cTabelaPedidoVenda)
+	::cDescricao := "Pedido de venda"
+
+	::jCfgImportacao := jsonObject():New()
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := alltrim(aVerbos[iVerbo])
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + lower(cVerbo) + '.json'
+
+		if (upper(cVerbo) == 'PUT') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração para confirmação de importação do pedido de venda (informar pedido importado)
+			cDados := '{' + CRLF
+			cDados += '	"pedido": "{|| alltrim(SC5->C5_NUM)}",' + CRLF
+			cDados += '	"exportado": {' + CRLF
+			cDados += '		"date": "' + "{|| StrTran(FWTimeStamp(3, MSDATE()), 'T', ' ')" + '}",' + CRLF
+			cDados += '		"timezone_type": 3,' + CRLF
+			cDados += '		"timezone": "America/Sao_Paulo"' + CRLF
+			cDados += '	}' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória*/
+		elseif (upper(cVerbo) == 'GET') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta de pedido de venda específico
+			// a leitura do endpoint retorna um array de pedidos de venda.
+			// o json abaixo trata dos dados de um pedido de venda
+			MemoWrite(cArqCFG, '{}')
+		elseif (upper(cVerbo) == 'POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para gravação de pedido de venda específico
+			// o json abaixo trata dos dados de um pedido de venda
+			MemoWrite(cArqCFG, '{}')
+		elseif (upper(cVerbo) == 'IMPORTA') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta de pedido de venda específico
+			// a leitura do endpoint retorna um array de pedidos de venda.
+			// o json abaixo trata dos dados de um pedido de venda
+			// CODIGO = GAR / VENDA / TROCA, esse código será utilizado para os 3 tipos
+			cDados := '{' + CRLF
+			cDados += '	"itens": {' + CRLF
+			cDados += '		"campo": "itens",' + CRLF
+			cDados += '		"cfg": {' + CRLF
+			cDados += '			"EMP": "{|| cValToChar(oRest[' + "'cnpj'" + '])}",' + CRLF
+			cDados += '			"XIDPED": "{|| cValToChar(oRest[' + "'pedido'" + '])}",' + CRLF
+			cDados += '			"EMIS": "{|| stod(left(cValToChar(oRest[' + "'data'" + ']),10))}",' + CRLF
+			cDados += '			"TPPED": "{|| cValToChar(oRest[' + "'codigo'" + '])}",' + CRLF
+			cDados += '			"COND": "{|| cValToChar(oRest[' + "'codigo_condicao'" + '])}",' + CRLF
+			cDados += '			"ENTREG": "{|| stod(left(cValToChar(oRest[' + "'entrega'" + ']),10))}",' + CRLF
+			cDados += '			"ACRESC": "{|| oRest[' + "'valor_adicional_fabricante'" + ']}",' + CRLF
+			cDados += '			"DESCON": "{|| oRest[' + "'valor_desconto_fabricante'" + ']}",' + CRLF
+			cDados += '			"XIDITE": "{|| cValToChar(oRest[' + "'itens'][iItem]['pedido_item'" + '])}",' + CRLF
+			cDados += '			"PROD": "{|| cValToChar(oRest[' + "'itens'][iItem]['referencia'" + '])}",' + CRLF
+			cDados += '			"QTDVEN": "{|| val(oRest[' + "'itens'][iItem]['qtde'" + '])}",' + CRLF
+			cDados += '			"PRCVEN": "{|| val(oRest[' + "'itens'][iItem]['preco'" + '])}",' + CRLF
+			cDados += '			"IPI": "{|| val(oRest[' + "'itens'][iItem]['ipi'" + '])}",' + CRLF
+			cDados += '			"XIDOS": "{|| cValToChar(oRest[' + "'itens'][iItem]['os'" + '])}"' + CRLF
+			cDados += '		}' + CRLF
+			cDados += '	}' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := ''
+		endif
+	next iVerbo
+
+/*
+	// se necessário cria o arquivo para ser usado na consulta do pedido de venda
+	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
+
+	if !File(cArqSHOW)
+		cDados := '{' + CRLF
+		cDados += '	"referencia": {' + CRLF
+		cDados += '		"referencia": "B1_COD"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"descricao": {' + CRLF
+		cDados += '		"referencia": "B1_DESC"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"codigoLinha": {' + CRLF
+		cDados += '		"referencia": "B5_CODLIN"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"codigoFamilia": {' + CRLF
+		cDados += '		"referencia": "B1_SUBGRP"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"garantia": {' + CRLF
+		cDados += '		"referencia": "B1_TGAR"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"numeroSerieObrigatorio": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Série obrigatória'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Número de série obrigatório'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ativo": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Ativo'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Produto Ativo?'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"'1=Sim;2=Não'"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"origem": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Origem'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Origem do produto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 3}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"voltagem": {' + CRLF
+		cDados += '		"referencia": "B1_VOLT"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ipi": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'IPI'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Alíquota de IPI'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 10}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"classificacaoFiscal": {' + CRLF
+		cDados += '		"referencia": "B1_CLASFIS"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"nomeComercial": {' + CRLF
+		cDados += '		"referencia": "B1_DESCNF"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"trocaObrigatoria": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Troca obrigatória'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Troca de produto obrigatória ao abrir a OS'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"produto": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'ID Telecontrol'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'ID do produto no Telecontrol'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	}' + CRLF
+		cDados += '}' + CRLF
+		MemoWrite(cArqSHOW, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+*/
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCPedidoVenda
+local lRet := .F. as logical
+local iHeader
+local oHeaderBlock as object
+local aHeaderAPI as array
+local cURIVerbo as character
+local cDescricao as character
+local cEndPoint as character
+local oRest as object
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	cVerbo := lower(cVerbo)
+	oHeaderBlock := ::oHeader
+
+	if cVerbo == 'importa' // importação tem tratamento específico
+
+		cURIVerbo := ::cURI
+
+		if ::oEndpoints:HasProperty(cVerbo)
+
+			if ::oEndpoints[cVerbo]:HasProperty('description')
+				cDescricao := ::oEndpoints[cVerbo]['description']
+			else
+				cDescricao := ::cAPI + ' ' + cVerbo
+			endif
+			if ::oEndpoints[cVerbo]:HasProperty('endpoint')
+				cEndpoint := Eval(&(::oEndpoints[cVerbo]['endpoint']))
+			else
+				cEndpoint := '/'
+			endif
+
+			// URI específica para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('uri')
+				cURIVerbo := ::oEndpoints[cVerbo]['uri']
+			endif
+
+			// header específico para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('header')
+				oHeaderBlock := ::oEndpoints[cVerbo]['header']
+			endif
+
+			if ::oEndpoints[cVerbo]:HasProperty('returnID')
+				::cTagID := ::oEndpoints[cVerbo]['returnID']
+			endif
+
+			// faz a montagem do header
+			aHeaderAPI := {}
+			cKey := ""
+			cValue := ""
+			for iHeader := 1 to len(oHeaderBlock)
+				cKey := oHeaderBlock[iHeader]['key']
+				cValue := Eval(&(oHeaderBlock[iHeader]['value']))
+
+				aAdd(aHeaderAPI, cKey + ":" + cValue)
+			next iHeader	
+
+			::oLOG:cDescricao := cDescricao
+			::oLOG:cURI := cURIVerbo
+			::oLOG:cEndpoint := alltrim(cEndpoint)
+			::oLOG:cVerbo := cVerbo
+
+			//Prepara o Rest.
+			oRest := FWREST():New(::oLOG:cURI)
+			if !empty(::oLOG:cEndpoint)
+				oRest:SetPath(::oLOG:cEndpoint)
+			endif
+
+			//faz a requisição ao endpoint
+			oRest:SetGetParams(::oLOG:cJsonEnvio)
+			lRet := oRest:Get(aHeaderAPI)
+
+			Begin Sequence
+				::oLOG:cJsonStatus := oRest:oResponseH:cStatusCode
+			End Sequence
+
+			::oLOG:cJsonRetorno := oRest:GetResult() // resultado melhor que :GetLastError()
+
+			cRetorno := ::oLOG:cJsonRetorno
+			cCodRet := ::oLOG:cJsonStatus
+
+		endif
+
+	else
+
+		lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta, cConsulta2)
+
+	endif
+
+return lRet
+
+
+method Importa(dDataInicial as date, dDataFinal as date, cCodRet as character, cRetorno as character) as logical class TTLCPedidoVenda
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaTab := (::cTabela)->(GetArea()) as array
+local cDataInicial as character
+local cDataFinal as character
+local jsonPedidosDeVenda as json
+local cArqCFG as character
+
+default dDataInicial := MSDATE() - GetMV('TI_DIASPED',.F.,10)
+default dDataFinal := MSDATE()
+default cCodRet := '500'
+default cRetorno := '{}'
+
+	::oLOG:cClasse := 'PedidoVenda.TTLCPedidoVenda.Importa'
+
+	lRet := chkFile(::cTabela)
+
+	if lRet // se conseguiu abrir a tabela
+		cDataInicial := left(FWTimeStamp(3, dDataInicial),10)
+		cDataFinal := left(FWTimeStamp(3, dDataFinal),10)
+
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('importa', @cCodRet, @cRetorno, cDataInicial, cDataFinal)
+
+		// se conseguiu o retorno da API, verifico se há ordens de serviço para importar
+		if lRet
+//			cRetorno := fTesteOS()
+
+			cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_importa.json'
+			::jCfgImportacao:fromJson(MemoRead(cArqCFG))
+
+			jsonPedidosDeVenda := jsonObject():New()
+			jsonPedidosDeVenda:fromJson('{"response": ' + cRetorno + '}')
+
+			if len(jsonPedidosDeVenda['response']) > 0
+				// importa a ord.serv. diretamente para a tabela
+				::ImportaPedidosVenda(jsonPedidosDeVenda['response'])
+			endif
+
+			jsonPedidosDeVenda:fromJson('{}')
+
+			FWFreeVar(@jsonPedidosDeVenda)
+		endif
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Pedido de venda não encontrada no Protheus', 'Consulta Pedido de Venda no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaTab)
+
+return lRet
+
+
+method Consulta(cCodigo as character, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg as logical) as logical class TTLCPedidoVenda
+local lRet := .F. as logical
+
+default cCodigo := (::cTabela)->B1_COD
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	::oLOG:cClasse := 'PedidoVenda.TTLCPedidoVenda.Consulta'
+
+	cRetorno := ''
+
+	if empty(cCodigo)
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Para efetuar a consulta é necessário informar o número do pedido de venda Protheus', 'Consultar Pedido de Venda no Telecontrol')
+		endif
+	else
+		(::cTabela)->(dbSetOrder(1)) // ??_FILIAL + ??_NUM
+		lRet := (::cTabela)->(dbSeek(xFilial() + cCodigo))
+
+		if lRet // se conseguiu posicionar no registro correto
+			::nRegistro := (::cTabela)->(Recno())
+			::oLOG:nRegistro := (::cTabela)->(Recno())
+			lRet := _Super:Consulta(cCodigo, @cCodRet, @cRetorno, lMostraMsg, lMostraReg)
+		else
+			// LOG
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Pedido de venda não encontrado no Protheus', 'Consultar Pedido de Venda no Telecontrol')
+			endif
+		endif
+	endif
+
+return lRet
+
+
+method ImportaPedidosVenda(aPedidos as array, cCodRet as character, cRetorno as character) as logical class TTLCPedidoVenda
+local iPedido as numeric
+//local iPeca as numeric
+//local iAnexo as numeric
+local AreaTab := (::cTabela)->(GetArea()) as array
+local iCpo as numeric
+local iItem as numeric
+//local jsonPedidoVenda as json
+//local jsonPeca as json
+//local jsonAnexo as json
+local lGravouPed as logical
+local xConteudo
+local nTamPed := TamSX3(::cPrefixoCampo+'_XIDPED')[1] as numeric
+
+Default cCodRet := '500'
+Default cRetorno := ''
+
+	(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_XIDPED
+
+	aPedNames := ::jCfgImportacao['itens']['cfg']:GetNames()
+
+	// mantém somente os campos existentes na tabela intermediária de pedidos de venda
+	for iCpo := len(aPedNames) to 1 step -1
+		if (::cTabela)->(FieldPos(::cPrefixoCampo+'_'+aPedNames[iCpo])) == 0
+			aDel(aPedNames, iCpo)
+			aSize(aPedNames, len(aPedNames)-1)
+		endif
+	next iCpo
+
+	for iPedido := 1 to len(aPedidos)
+
+//		jsonPedidoVenda := aPedidos[iPedido]
+		oRest := aPedidos[iPedido]
+
+		// o pedido será gravado em tabela intermediária, para intregação em outro momento
+
+		cIDPedidoVenda := padr(Eval(&(::jCfgImportacao['itens']['cfg']['XIDPED'])),nTamPed)
+
+		// se o pedido de venda ainda não foi gravado...
+		lGravouPed := (::cTabela)->(dbSeek(xFilial() + cIDPedidoVenda))
+
+		if !lGravouPed
+
+			Begin Transaction
+
+				// grava os itens da ordem de serviço
+				if oRest:HasProperty(::jCfgImportacao['itens']['campo'])
+					cCpoItens := ::jCfgImportacao['itens']['campo']
+
+					for iItem := 1 to len(oRest[cCpoItens])
+
+						// grava o registro na tabela intermediária
+						if len(aPedNames) > 0
+							Reclock(::cTabela, .T.)
+
+							for iCpo := 1 to len(aPedNames)
+								xConteudo := Eval(&(::jCfgImportacao['itens']['cfg'][aPedNames[iCpo]]))
+								if !empty(xConteudo)
+									(::cTabela)->&(::cPrefixoCampo+'_'+aPedNames[iCpo]) := xConteudo
+								endif
+							next iCpo
+
+							(::cTabela)->&(::cPrefixoCampo+'_FILIAL') := xFilial(::cTabela)
+
+							(::cTabela)->(MSUnlock())
+						endif
+
+					next iItem
+
+				endif
+
+			End Transaction
+
+		endif
+
+	next iPedido
+
+	(::cTabela)->(RestArea(AreaTab))
+
+return
+
+method AvisoDeImportacaoDePedidoVenda(cPedidoVenda as character, cCodRet as character, cRetorno as character) as logical class TTLCPedidoVenda
+local lRet as logical
+local AreaTabela := (::cTabela)->(GetArea())
+
+Default cCodRet := '500'
+Default cRetorno := ''
+
+	cPedidoVenda := padr(cPedidoVenda, TamSX3(::cPrefixoCampo+'_NUM')[1])
+
+	if cPedidoVenda <> (::cTabela)->&(::cPrefixoCampo+'_NUM')
+		(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_NUM
+		(::cTabela)->(dbSeek(xFilial() + cPedidoVenda))
+	endif
+
+	lRet := (cPedidoVenda == (::cTabela)->&(::cPrefixoCampo+'_NUM'))
+
+	if lRet
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, SC5->C5_XIDTLC)
+	endif
+
+	(::cTabela)->(RestArea(AreaTabela))
+
+return lRet
+
+
+user function testeosrv(tipo as numeric)//Telecontrol.Integracao.PedidoVenda.u_testeosrv(3)
+local oAPIPedidoVenda := TTLCPedidoVenda():New() as object
+local lRet := .F. as logical
+local cRetorno as character
+local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZI')) as character
+default tipo := 1
+
+	chkFile(cTabelaPedidoVenda)
+
+	if tipo == 1
+		lRet := oAPIPedidoVenda:Cadastra()
+	elseif tipo == 2
+		lRet := oAPIPedidoVenda:Consulta(,,@cRetorno,,.T.)
+	elseif tipo == 3
+		lRet := oAPIPedidoVenda:Importa(,,,@cRetorno)
+	endif
+
+	if lRet
+		if tipo == 1
+			alert('tudo certo')
+		else
+//			Alert(varinfo('Retorno', cRetorno))
+			Alert(cRetorno)
+		endif
+	else
+		alert('deu pau!')
+	endif
+
+return
+
+
+user function TLCImpPed(dDataInicial as date, dDataFinal as date)//Telecontrol.Integracao.PedidoVenda.u_TLCImpPed()
+local oAPIPedidoVenda := TTLCPedidoVenda():New() as object
+local cRetorno as character
+local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as character
+
+	chkFile(cTabelaPedidoVenda)
+	oAPIPedidoVenda:Importa(ctod('01/05/2025'),ctod('30/06/2025'),,@cRetorno)
+				//2025-05-01/dataFinal/2025-06-30
+	FWFreeObj(@oAPIPedidoVenda)
+
+return
+
+
+static function fTestePed()
+local cJsonTeste AS character
+//
+return cJsonTeste
+
+/* // pedidos NÃO exportados
+[
+    {
+        "pedido": 12157278,
+        "data": "2016-09-09 17:05:19.97444-03",
+        "cnpj": "22407532000180",
+        "codigo": "GAR",
+        "codigo_condicao": "002",
+        "entrega": null,
+        "exportado": null,
+        "valor_adicional_fabricante": 0,
+        "valor_desconto_fabricante": 0
+        "itens": [
+          {
+            "pedido_item": 454545,
+            "referencia": "PKI.5485",
+            "qtde": "1",
+            "preco": "10000",
+            "ipi": 1.00,
+            "os": 4652525
+          }
+        ]
+    }
+]
+*/
+
+/* // consulta pedido
+{
+  "dados": {
+    "pedido": {
+      "pedido": 30144271,
+      "data": "2018-06-19 09:29:55.738691-03",
+      "cnpj": "35457011000180",
+      "codigo": "GAR",
+      "codigo_condicao": "GAR",
+      "entrega": null,
+      "exportado": null,
+      "tipo_frete": null,
+      "valores_adicionais": null,
+      "transportadora": null,
+      "status_pedido": 18,
+      "status_descricao": "Aguardando aprovação"
+    },
+    "itens": [
+      {
+        "pedido_item": 55659465,
+        "referencia": "002",
+        "qtde": "1",
+        "preco": "1.5",
+        "ipi": "0",
+        "os": "49133789",
+        "qtde_cancelada": "0",
+        "qtde_faturada": "0",
+        "ref_produto": "003",
+        "des_produto": "Produto teste 3"
+      },
+      {
+        "pedido_item": 55659466,
+        "referencia": "003",
+        "qtde": "1",
+        "preco": "1.5",
+        "ipi": "0",
+        "os": "49133789",
+        "qtde_cancelada": "0",
+        "qtde_faturada": "0",
+        "ref_produto": "003",
+        "des_produto": "Produto teste 3"
+      }
+    ]
+  }
+}
+*/

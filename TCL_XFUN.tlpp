@@ -1,0 +1,112 @@
+#include "tlpp-core.th"
+#include "parmtype.ch"
+#include "tlc_define.ch"
+
+namespace Telecontrol.Funcoes
+using namespace Telecontrol.Classe
+
+
+/* funções gerais para uso na integração Protheus > Telecontrol > Protheus */
+
+/*/{Protheus.doc} TLCConfig
+	Função para criar a instância da classe TLCConfig.
+	Deve ser executada sempre que houver necessidade os dados de configuração da integração Protheus > Telecontrol
+	@type  user function
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+User Function TLCConfig()
+	if type("oTLCConfig") <> "O"
+		Public oTLCConfig // variável pública com a instância da classe de configurações de integração Protheus > Telecontrol
+		oTLCConfig := Telecontrol.Integracao.Cliente.TTLCConfig():New()
+	endif
+Return
+
+
+/*/{Protheus.doc} TLCCadastra
+	Função para cadastrar entidades no Telecontrol
+	@type  user function
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+User Function TLCCadastra(nTipoCadastro as integer)
+local oAPI as object
+
+	if (nTipoCadastro == TCCON_PECA)
+		oAPI := Telecontrol.Integracao.Peca.TTLCPeca():New()
+	elseif (nTipoCadastro == TCCON_PRODUTO)
+		oAPI := Telecontrol.Integracao.Produto.TTLCProduto():New()
+	elseif (nTipoCadastro == TCCON_POSTO)
+		oAPI := Telecontrol.Integracao.Posto.TTLCPosto():New()
+	endif
+
+	if (oAPI <> nil)
+		FwMsgRun(NIL, {|| TLCExec(oAPI, TCEXEC_CADASTRO)}, "Telecontrol", "Gravando informações...")
+	endif
+
+	FWFreeObj(@oAPI)
+
+Return
+
+
+/*/{Protheus.doc} TLCConsulta
+	Função para mostrar uma tela com o resultado da consulta no Telecontrol
+	@type  user function
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+User Function TLCConsulta(nTipoConsulta as integer)
+local oAPI as object
+
+	if (nTipoConsulta == TCCON_PECA)
+		oAPI := Telecontrol.Integracao.Peca.TTLCPeca():New()
+	elseif (nTipoConsulta == TCCON_PRODUTO)
+		oAPI := Telecontrol.Integracao.Produto.TTLCProduto():New()
+	elseif (nTipoConsulta == TCCON_POSTO)
+		oAPI := Telecontrol.Integracao.Posto.TTLCPosto():New()
+	endif
+
+	FwMsgRun(NIL, {|| TLCExec(oAPI, TCEXEC_CONSULTA)}, "Telecontrol", "Buscando informações...")
+
+	FWFreeObj(@oAPI)
+
+Return
+
+Static Function TLCExec(oAPI as object, nTipoExec as integer)
+
+	if (valtype(oAPI) == "O")
+		if (nTipoExec = TCEXEC_CADASTRO)
+			oAPI:Cadastra()
+		elseif (nTipoExec = TCEXEC_CONSULTA)
+			oAPI:Consulta(,,,,.T.)
+		endif
+	endif
+
+Return
+
+
+User Function TLCLOG()//U_TLCLOG()
+Local cStatus as character
+
+	cStatus := '1=aguardando integração'
+	cStatus += ';2=erro ao transmitir'
+	cStatus += ';3=registro transmitido, porém o ID não foi gravado'
+	cStatus += ';4=registro transmitido, porém o retorno não é um json válido'
+	cStatus += ';X=registro transmitido/recebido com sucesso'
+
+Return cStatus

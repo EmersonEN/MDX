@@ -1,0 +1,27 @@
+#include "totvs.ch"
+
+USER FUNCTION MT20FOPOS()
+Local nOpc := PARAMIXB[1]
+Local oAPIPosto
+
+    if !empty(SA2->A2_TPOSTO) // neste ponto o registro ainda está em memória
+
+        oAPIPosto := Telecontrol.Integracao.Posto.TTLCPosto():New()
+
+        if nOpc == 2 // inclusão
+            oAPIPosto:Cadastra()
+        elseif nOpc == 4 // alteraçãO
+            // consulta o posto no telecontrol
+            cCodRet := '500'
+            if !oAPIPosto:Consulta(,@cCodRet,,.F.,.F.) .OR. (cCodRet <> '200')
+                oAPIPosto:Cadastra()
+            elseif (cCodRet == '200')
+                oAPIPosto:Altera()
+            endif
+        endif
+
+        FWFreeObj(@oAPIPosto)
+
+    endif
+
+RETURN

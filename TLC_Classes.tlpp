@@ -1,0 +1,999 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+/*
+Classes para uso na integração Telecontrol.
+*/
+
+namespace Telecontrol.Classe
+using namespace Telecontrol.Funcoes
+
+/*/{Protheus.doc} TTLCUtil
+	Classe com rotinas úteis para uso na integração Protheus > Telecontrol
+	@type  class
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+class TTLCUtil
+
+	public method New() as object
+
+	public method AddPathDelimiter() as character // acrescenta o delimitador de pastas no final do caminho informado
+	public method RemovePathDelimiter() as character // remove o delimitador de pastas no final do caminho informado
+	public method CriaDir(cPath) as logical  // cria a pasta indicada no parâmetro. cria toda a árvore, se necessário
+
+endclass
+
+
+method New() as object class TTLCUtil
+	// cria a instância da classe
+return Self
+
+
+method AddPathDelimiter(cCaminho as character) as character class TTLCUtil
+Local cSeparadorPasta := GetMV('TI_FLDSEP',.F.,'\') as character // parâmetro com o separador de pastas do sistema
+Local cResult := alltrim(cCaminho) as character
+
+    if right(cResult, 1) <> cSeparadorPasta
+        cResult += cSeparadorPasta
+    endif
+
+Return cResult
+
+
+method RemovePathDelimiter(cCaminho as character) as character class TTLCUtil
+local cSeparadorPasta := GetMV('TI_FLDSEP',.F.,'\') as character // parâmetro com o separador de pastas do sistema
+local cResult := alltrim(cCaminho) as character
+local nTam := len(cResult) as integer
+
+    if right(cResult, 1) == cSeparadorPasta
+        cResult := Substr(cSeparadorPasta,1,nTam-1)
+    endif
+
+Return cResult
+
+
+method CriaDir(cPath as character) as logical class TTLCUtil
+Local nPos   := 0 as integer
+Local cRoot  := "" as character
+Local cBarra := GetMV('TI_FLDSEP',.F.,'\') as character // parâmetro com o separador de pastas do sistema
+Local lRet   := .F. as logical
+Local cError := '' as character
+Local bError
+
+Default cPath := ""
+
+	cPath := ALLTRIM(cPath)
+
+	if empty(cPath)
+		Return .F.
+	endif
+
+	// inclui o separador de pastas
+	cPath := ::AddPathDelimiter(cPath)
+
+	bError := ErrorBlock({ |oError| cError := oError:Description})
+
+	Begin Sequence
+
+		lRet := .T.
+
+		while (nPos := AT( cBarra, cPath)) > 0
+			if EMPTY( LEFT(cPath, nPos -1))
+				cRoot += LEFT(cPath, nPos)
+			else
+				if AT(right(LEFT(cPath, nPos -1),1),":.") > 0
+					cRoot := LEFT(cPath, nPos -1)
+				else
+					if right(cRoot, 1) <> cBarra
+						cRoot += cBarra
+					ENDIF
+					cRoot += LEFT(cPath, nPos -1)
+				ENDIF
+				IF right(cRoot, 1) <> ":"
+					MAKEDIR(cRoot)
+				ENDIF
+			ENDIF
+			cPath := STUFF(cPath, 1, nPos, "")
+		End
+
+	End Sequence
+
+	//Restaurando bloco de erro do sistema
+	ErrorBlock(bError)
+
+	lRet := Empty(cError)
+
+Return lRet
+
+
+/*/{Protheus.doc} TTLCLog
+	Classe para tratar do LOG de integração
+	@type  class
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+class TTLCLog
+
+	public data cAliasLOG as character	// Alias da tabela de LOG do processo de integração
+	public data cPrefCampo as character	// prefixo para os campos da tabela de log
+
+	public data cAPI as character
+	public data cDescricao as character
+	public data cURI as character
+	public data cEndpoint as character
+	public data cVerbo as character
+	public data cJsonEnvio as character
+	public data cStatus as character
+	public data cJsonRetorno as character
+	public data cJsonStatus as character
+	public data cTabela as character
+	public data nRegistro as integer
+	public data cHistorico as character
+	public data cIDRegistro as character
+	public data nRegistroLOG as integer
+	public data cClasse as character
+
+	public method New() as object
+	public method GravaLOG()
+	public method AlteraLOG() as logical
+	public method ClonaLOG() as logical
+	private method ValidaLOG() as logical
+
+endclass
+
+
+method New() as object class TTLCLog
+
+	::cAliasLOG := alltrim(GetMV('TI_LOGTAB', .F., 'SZ0'))
+	::cPrefCampo := if(left(::cAliasLOG,1)=="S", right(::cAliasLOG,2), ::cAliasLOG)
+
+return Self
+
+
+method ValidaLOG() as logical class TTLCLog
+local lRet := .F. as logical
+
+	if !empty(::cAliasLOG) .AND. AliasInDic(::cAliasLOG)
+		lRet := chkFile(::cAliasLOG)
+	endif
+
+return lRet
+
+
+method GravaLOG(cPrefLOG as character, lTabelaLOG as logical, nRegLOG as integer) class TTLCLog
+local cError := "" as character
+local bError
+local dDataMov := MSDATE() as date
+local cHoraMov := TIME() as character
+
+default cPrefLOG := ''
+default lTabelaLOG := .F.
+default nRegLOG := 0
+
+	if (nRegLOG == 0)
+		::nRegistroLOG := 0
+	endif
+
+	if ::ValidaLOG() // grava na tabela
+
+		bError := ErrorBlock({ |oError| cError := oError:Description})
+
+		Begin Sequence
+
+			if (nRegLOG > 0)
+				(::cAliasLOG)->(dbGoTo(nRegLOG)) // posiciona no registro indicado
+
+				if ((::cAliasLOG)->(Recno()) <> nRegLOG)
+					// força o erro
+					__EXCEPTION__->ERROR := "Registro não encontrado na tabela de LOG (" + ::cAliasLOG + ")"
+				else
+					::nRegistroLOG := nRegLog
+				endif
+			endif
+
+			if (nRegLOG == 0) .OR. ((::cAliasLOG)->(Recno()) == nRegLOG)
+				// abre o model e insere o registro
+				// sem model, por enquanto
+				Reclock(::cAliasLOG, (nRegLOG == 0)) // se não indicou um registro, cria um novo
+				(::cAliasLOG)->&(::cPrefCampo + "_FILIAL") := xFilial(::cAliasLOG)
+				(::cAliasLOG)->&(::cPrefCampo + "_API") := ::cAPI
+				(::cAliasLOG)->&(::cPrefCampo + "_DESCRI") := ::cDescricao
+				(::cAliasLOG)->&(::cPrefCampo + "_URI") := ::cURI
+				(::cAliasLOG)->&(::cPrefCampo + "_ENDP") := ::cEndpoint
+				(::cAliasLOG)->&(::cPrefCampo + "_VERBO") := ::cVerbo
+				(::cAliasLOG)->&(::cPrefCampo + "_DADOS") := ::cJsonEnvio
+				if (nRegLOG == 0)
+					(::cAliasLOG)->&(::cPrefCampo + "_DATA") := dDataMov
+					(::cAliasLOG)->&(::cPrefCampo + "_HORA") := cHoraMov
+				endif
+				if (nRegLOG > 0)
+					(::cAliasLOG)->&(::cPrefCampo + "_DTPROC") := dDataMov
+					(::cAliasLOG)->&(::cPrefCampo + "_HRPROC") := cHoraMov
+				endif
+				(::cAliasLOG)->&(::cPrefCampo + "_STATUS") := ::cStatus
+				(::cAliasLOG)->&(::cPrefCampo + "_RET") := ::cJsonRetorno
+				(::cAliasLOG)->&(::cPrefCampo + "_CODRET") := ::cJsonStatus
+				(::cAliasLOG)->&(::cPrefCampo + "_TABELA") := ::cTabela
+				(::cAliasLOG)->&(::cPrefCampo + "_RECNO") := ::nRegistro
+				(::cAliasLOG)->&(::cPrefCampo + "_MSG") := ::cHistorico
+				(::cAliasLOG)->&(::cPrefCampo + "_IDRET") := ::cIDRegistro
+				(::cAliasLOG)->&(::cPrefCampo + "_CLASSE") := ::cClasse
+				(::cAliasLOG)->(MSUnlock())
+
+				::nRegistroLOG := (::cAliasLOG)->(Recno())
+				lTabelaLOG := .T.
+				//lRet := .T.
+			endif
+
+		End Sequence
+
+		ErrorBlock(bError)
+
+		// se não conseguiu gravar o log na tabela, grava a informação no console
+		if !empty(cError)
+			conout('['+::cAPI+'] ' + upper(cPrefLOG) + ' ' + dtos(dDataMov) + ' ' + cHoraMov + ' - Registro:' + alltrim(cvaltochar(::nRegistro)) + ' - '+::cHistorico+' - Erro:' + cError )
+		endif
+
+	else // console.log
+		conout('['+::cAPI+'] ' + upper(cPrefLOG) + ' ' + dtos(dDataMov) + ' ' + cHoraMov + ' - Registro:' + alltrim(cvaltochar(::nRegistro)) + ' - '+::cHistorico )
+	endif
+
+return
+
+
+method AlteraLOG(cPrefLOG as character, lGravouTabelaLOG as logical, nRegLOG as integer) as logical class TTLCLog
+local lRet := .F. as logical
+default lGravouTabelaLOG := .F.
+default nRegLOG := ::nRegistroLOG
+
+	lRet := ::GravaLOG(cPrefLOG, @lGravouTabelaLOG, nRegLOG)
+
+return lRet
+
+
+method ClonaLOG(nRegistro as integer, lLimpaStaus as logical) as logical class TTLCLog
+local lRet := .F. as logical
+default lLimpaStaus := .T.
+
+	if ::ValidaLOG()
+		/* abre o model e clona o registro */
+		lRet := .T.
+	else
+		// console
+//////////////////////////////			// LOG
+	endif
+
+return lRet
+
+
+/*/{Protheus.doc} TTLCAPICadastro
+	Classe com as propriedades comuns das APIs
+	@type  class
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+class TTLCAPICadastro
+
+	public data oUtil as object
+	public data oEndpoints as object
+	public data cAPI as character
+	public data cDescricao as character
+	public data cURI as character
+	public data oHeader as object
+	public data cTabela as character
+	public data cPrefixoCampo as character
+	public data cCampoID as character
+	public data cTagID as character
+	public data cPastaCFG as character
+	public data cArqEndpoints as character
+	public data lExisteCampoID as logical
+	public data nRegistro as numeric
+
+	private data oLOG as object
+
+	public method New(cNomeAPI, cAliasTabela) as object
+	public method CallApi(cVerbo, cCodRet, cRetorno, cConsulta, cConsulta2) as logical
+	public method GravaID(cID) as logical
+	public method Consulta() as logical
+	public method ExibeRetorno()
+
+endclass
+
+
+/*/{Protheus.doc} TTLCAPICadastro.New
+	Método para criação da classe TTLCConfig.
+	As propriedades da classe contém as configurações para uso das APIs do Telecontrol
+	@type  method
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+method New(cNomeAPI as character, cAliasTabela as character) as object class TTLCAPICadastro
+local jsonEndpoints := jsonObject():New() as object
+local cRetoJson as character
+local cDados as character
+local cStartPath := GetSrvProfString("Startpath","") as character
+
+	::oUtil := TTLCUtil():New()
+	::oLOG := TTLCLog():New()
+	::oEndpoints := jsonObject():New()
+
+	::oHeader := jsonObject():New()
+	::cAPI := cNomeAPI
+	::cTabela := alltrim(upper(cAliasTabela))
+	::cTabela := alltrim(upper(cAliasTabela))
+	::cPrefixoCampo := if(upper(left(::cTabela,1))=="S", right(::cTabela,2), ::cTabela)
+	::cCampoID := ::cPrefixoCampo+'_XIDTLC'
+	::lExisteCampoID := ((::cTabela)->(FieldPos(::cCampoID)) > 0)
+	::cTagID := ""
+	::cURI := GetMV('TI_URITLC',.F., 'http://api2.telecontrol.com.br')
+	::cPastaCFG := ::oUtil:RemovePathDelimiter(GetMV('TI_FLDCFG', .F., if(!empty(cStartPath),::oUtil:AddPathDelimiter(cStartPath),"") + '@telecontrol'))
+	::nRegistro := (::cTabela)->(Recno())
+
+	// dados iniciais do LOG
+	::oLOG:cAPI := ::cAPI
+	::oLOG:cTabela := ::cTabela
+	::oLOG:nRegistro := (::cTabela)->(Recno())
+
+	// cria a pasta de trabalho
+	if !empty( ::cPastaCFG ) .AND. !File( ::cPastaCFG )
+		::oUtil:CriaDir( ::cPastaCFG )
+	endif
+
+	::cArqEndpoints := ::oUtil:AddPathDelimiter(::cPastaCFG) + 'endpoints.json'
+
+	if !File(::cArqEndpoints)
+/*
+		{ "access-application-key": "3ff83c9383ca0f78166bf92638625c443d11df04", "access-env": "PRODUCTION" }
+		{ "access-application-key": "f3942ae16f4cb317ba55de58c7f4dc1b4892e091", "access-env": "HOMOLOGATION" }
+*/
+		cDados := '{' + CRLF
+		cDados += '	"uri": "http://api2.telecontrol.com.br",' + CRLF
+		cDados += '	"header": [ '+ CRLF
+		cDados += '		{ '+ CRLF
+		cDados += '			"key": "Access-Application-Key", '+ CRLF
+		cDados += '			"value": "{|| '+"'f3942ae16f4cb317ba55de58c7f4dc1b4892e091'"+'}" '+ CRLF
+		cDados += '		}, '+ CRLF
+		cDados += '		{ '+ CRLF
+		cDados += '			"key": "Access-Env", '+ CRLF
+		cDados += '			"value": "{|| '+"'HOMOLOGATION'"+'}" '+ CRLF
+		cDados += '		}, '+ CRLF
+		cDados += '		{ '+ CRLF
+		cDados += '			"key": "Content-Type", '+ CRLF
+		cDados += '			"value": "{|| '+"'application/json'"+'}" '+ CRLF
+		cDados += '		} '+ CRLF
+		cDados += '	],' + CRLF
+		cDados += '	"produtos": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Cadastro de produto",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/produtos'"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Atualização de produto",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/produtos/referencia/'"+' + cConsulta}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta produto",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/produtos/referencia/'"+' + cConsulta}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"pecas": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Cadastros de peça",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/peca'"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Atualização de peça",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/peca/referencia/'"+' + cConsulta}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta peça",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/peca/referencia/'"+' + cConsulta}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"postos": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Cadastro de postos autorizados",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/posto'"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Atualização de posto autorizado",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/posto/cnpj/'"+' + cConsulta}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta posto autorizado",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/posto/cnpj/'"+' + cConsulta}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"precos": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Cadastro de preço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/tabelaPreco'"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Alteração de preço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/tabelaPreco/siglaTabela/'"+' + cConsulta + '+"'/pecaReferencia/'" + ' + cConsulta2}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta preço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/tabelaPreco/siglaTabela/'"+' + cConsulta + '+"'/pecaReferencia/'" + ' + cConsulta2}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"delete": {' + CRLF
+		cDados += '			"description": "Excluir preço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-core/tabelaPreco/siglaTabela/'"+' + cConsulta + '+"'/pecaReferencia/'" + ' + cConsulta2}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"faturamento": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Cadastro de informações de faturamento",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-faturamento/faturamentos'"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Alteração de informações de faturamento",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-faturamento/faturamentos'"+'}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"cancelafaturamento": {' + CRLF
+		cDados += '		"post": {' + CRLF
+		cDados += '			"description": "Apaga informações de faturamento",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-faturamento/cancelaFaturamento'"+'}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ordemservico": {' + CRLF
+		cDados += '		"importa": {' + CRLF
+		cDados += '			"description": "Importação de ordens de serviço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/os/ordem/dataInicio/' + cConsulta + '/dataFim/' + cConsulta2"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta o ordem de serviço",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/os/ordem/os/' + cConsulta"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Marca a ordem de serviço como importada",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/os/ordem/os/' + cConsulta"+'}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"pedidovenda": {' + CRLF
+		cDados += '		"importa": {' + CRLF
+		cDados += '			"description": "Importação de pedidos de venda",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-pedido/pedidos/dataInicial/' + cConsulta + '/dataFinal/' + cConsulta2"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"get": {' + CRLF
+		cDados += '			"description": "Consulta o pedido de venda",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/os/ordem/os/' + cConsulta"+'}"' + CRLF
+		cDados += '		},' + CRLF
+		cDados += '		"put": {' + CRLF
+		cDados += '			"description": "Marca o pedido de venda como importado",' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/posvenda-pedido/pedidos/pedido/' + cConsulta"+'}"' + CRLF
+		cDados += '		}' + CRLF
+		cDados += '	}' + CRLF
+		cDados += '}' + CRLF
+		MemoWrite(::cArqEndpoints, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+
+	if File(::cArqEndpoints)
+		cRetoJson := jsonEndpoints:fromJson(MemoRead(::cArqEndpoints))
+
+		if (valtype(cRetoJson) == "U") .AND. !empty(::cAPI)
+			if jsonEndpoints:HasProperty('uri')
+				::cURI := jsonEndpoints['uri']
+			endif
+			if jsonEndpoints:HasProperty('header')
+				::oHeader := jsonEndpoints['header']
+			endif
+			if jsonEndpoints:HasProperty(lower(::cAPI))
+				::oEndpoints := jsonEndpoints[lower(::cAPI)]
+			else
+				// LOG
+			endif
+		endif
+
+	else
+		::oLOG:cStatus := '2'
+		::oLOG:cHistorico := 'O arquivo com as configurações de endpoints não existe ('+::cArqEndpoints+').'
+		::oLOG:cIDRegistro := ''
+		::oLOG:cJsonEnvio := ''
+		::oLOG:cJsonRetorno := ''
+		::oLOG:GravaLOG('[ERROR]') // cria um novo registro na tabela de log e grava o número do registro na propriade nRegistroLOG
+	endif
+	FWFreeObj(@jsonEndpoints)
+return Self
+
+
+/*/{Protheus.doc} TTLCAPICadastro.CallApi
+	Efetua a chamada à API com o 'verbo' solicitado
+	@type  method
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCAPICadastro
+local lRet := .F. as logical
+local cArqVerbo := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + cVerbo + '.json' as character
+local aNames as array
+local iNames as numeric
+local iHeader //as numeric
+local cURIVerbo := ::cURI as character
+local cDescricao as character
+local cEndPoint as character
+local cRetJson as character
+local oDadosOrigem := jsonObject():New() as object
+local oBody := jsonObject():New() as object
+local oRest as object
+local objRetorno := jsonObject():New() as object
+local cError := "" as character
+local bError
+local cPrefixoLOG := '' as character
+local oHeaderBlock as object
+local aHeaderAPI as array
+
+default cCodRet := "500"
+default cRetorno := ""
+
+	::oLOG:cAPI := ::cAPI
+	::oLOG:cTabela := ::cTabela
+	::oLOG:nRegistro := (::cTabela)->(Recno())
+	::oLOG:cStatus := '1'
+	::oLOG:cHistorico := ''
+	::oLOG:cIDRegistro := ''
+	::oLOG:cJsonEnvio := ''
+	::oLOG:cJsonRetorno := ''
+
+	if upper(cVerbo) <> "GET"
+		::oLOG:GravaLOG('[NEW]') // cria um novo registro na tabela de log e grava o número do registro na propriade nRegistroLOG
+	endif
+
+	cVerbo := lower(cVerbo)
+	oHeaderBlock := ::oHeader
+
+	if File(cArqVerbo)
+		if ::oEndpoints:HasProperty(cVerbo)
+
+			if ::oEndpoints[cVerbo]:HasProperty('description')
+				cDescricao := ::oEndpoints[cVerbo]['description']
+			else
+				cDescricao := ::cAPI + ' ' + cVerbo
+			endif
+			if ::oEndpoints[cVerbo]:HasProperty('endpoint')
+				cEndpoint := Eval(&(::oEndpoints[cVerbo]['endpoint']))
+			else
+				cEndpoint := '/'
+			endif
+
+			// URI específica para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('uri')
+				cURIVerbo := ::oEndpoints[cVerbo]['uri']
+			endif
+
+			// header específico para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('header')
+				oHeaderBlock := ::oEndpoints[cVerbo]['header']
+			endif
+
+			if ::oEndpoints[cVerbo]:HasProperty('returnID')
+				::cTagID := ::oEndpoints[cVerbo]['returnID']
+			endif
+
+			// faz a montagem do header
+			aHeaderAPI := {}
+			cKey := ""
+			cValue := ""
+			for iHeader := 1 to len(oHeaderBlock)
+				cKey := oHeaderBlock[iHeader]['key']
+				cValue := Eval(&(oHeaderBlock[iHeader]['value']))
+
+				aAdd(aHeaderAPI, cKey + ":" + cValue)
+			next iHeader	
+
+			::oLOG:cDescricao := cDescricao
+			::oLOG:cURI := cURIVerbo
+			::oLOG:cEndpoint := alltrim(cEndpoint)
+			::oLOG:cVerbo := cVerbo
+
+			cError := ""
+			bError := ErrorBlock({ |oError| cError := oError:Description})
+
+			Begin Sequence
+
+				oDadosOrigem:fromJson(MemoRead(cArqVerbo))
+				aNames := oDadosOrigem:GetNames()
+
+				if len(aNames) > 0
+					for iNames := 1 to len(aNames)
+						if !(upper(aNames[iNames]) == upper("returnID")) // returnID não deve ser enviado
+							oBody[aNames[iNames]] := Eval(&(oDadosOrigem[aNames[iNames]]))
+						endif
+					next iNames
+
+					::oLOG:cJsonEnvio := oBody:toJson()
+
+					if upper(cVerbo) <> "GET"
+						::oLOG:AlteraLOG('[PREPARE]')
+					endif
+				endif
+
+			End Sequence
+
+			ErrorBlock(bError)
+
+			if empty(cError)
+
+				//Prepara o Rest.
+				oRest := FWREST():New(::oLOG:cURI)
+				if !empty(::oLOG:cEndpoint)
+					oRest:SetPath(::oLOG:cEndpoint)
+				endif
+				if lower(left(::oLOG:cVerbo,4)) == 'post'
+					oRest:SetPostParams(::oLOG:cJsonEnvio)
+					lRet := oRest:Post(aHeaderAPI)
+				elseif lower(left(::oLOG:cVerbo,3)) == 'put'
+					lRet := oRest:Put(aHeaderAPI, ::oLOG:cJsonEnvio)
+				elseif lower(left(::oLOG:cVerbo,3)) == 'get'
+					oRest:SetGetParams(::oLOG:cJsonEnvio)
+					lRet := oRest:Get(aHeaderAPI)
+				elseif lower(left(::oLOG:cVerbo,6)) == 'delete'
+					lRet := oRest:Delete(aHeaderAPI)
+				endif
+
+				Begin Sequence
+					::oLOG:cJsonStatus := oRest:oResponseH:cStatusCode
+				End Sequence
+
+				::oLOG:cJsonRetorno := oRest:GetResult() // resultado melhor que :GetLastError()
+
+				cRetorno := ::oLOG:cJsonRetorno
+				cCodRet := ::oLOG:cJsonStatus
+
+			else
+				::oLOG:cJsonRetorno := '{"exception": "Exception", "message": "'+cError+'"}'
+				::oLOG:cHistorico := "Não foi possível obter os dados para envio do registro. Verifique o arquivo de configuração ("+cArqVerbo+")."
+				::oLOG:cStatus := "2"
+				cPrefixoLOG := '[ERROR]'
+
+			endif
+
+			if lRet
+
+				if !::lExisteCampoID .OR. empty(::cCampoID) .OR. empty(::cTagID)
+					// LOG ok, sem necesisdade de gravar o ID
+					::oLOG:cHistorico := 'Registro transmitido com sucesso'
+					::oLOG:cStatus := 'X'
+					cPrefixoLOG := '[SUCCESS]'
+				else
+					cRetJson := objRetorno:fromJson(::oLOG:cJsonRetorno)
+					::oLOG:cIDRegistro := Eval(&(::cTagID))
+
+					if upper(cVerbo) <> "GET"
+						::oLOG:AlteraLOG('[TRANSMITTED]')
+					endif
+
+					if valtype(cRetJson) == "U" // o retorno pôde ser lido
+						if ::GravaID(::oLOG:cIDRegistro)
+							::oLOG:cHistorico := 'Registro transmitido e ID gravado com sucesso'
+							::oLOG:cStatus := 'X'
+							cPrefixoLOG := '[SUCCESS]'
+						else
+							// LOG de transferência ok, mas não gravou o ID
+							::oLOG:cHistorico := 'Registro transmitido com sucesso, mas NÃO foi possível gravar o ID no registro'
+							::oLOG:cStatus := '3'
+							cPrefixoLOG := '[WARNING]'
+						endif
+					else
+						// LOG de transferência ok, mas não foi possível ler o json retorno
+						::oLOG:cHistorico := 'Registro transmitido com sucesso, mas o retorno não é um json válido (impossível obter o ID)'
+						::oLOG:cStatus := '4'
+						cPrefixoLOG := '[WARNING]'
+					endif
+				endif
+
+				// status
+				// 1-aguardando integração
+				// 2-erro ao transmitir o registro
+				// 3-registro transmitido com sucesso, porém o ID não foi gravado
+				// 4-registro transmitido com sucesso, porém o retorno não é um json válido
+				// X-registro transmitido/recebido com sucesso
+			else
+
+				if empty(::oLOG:cHistorico)
+					::oLOG:cHistorico := 'Erro ao transmitir o registro'
+				endif
+				::oLOG:cStatus := '2'
+				cPrefixoLOG := '[ERROR]'
+
+			endif
+
+			FWFreeObj(@oRest)
+
+		else
+			// LOG
+			::oLOG:cHistorico := 'As configurações do endpoint '+::cAPI+' não foram encontradas ('+::cArqEndpoints+').'
+			::oLOG:cStatus := '2'
+			cPrefixoLOG := '[ERROR]'
+		endif
+
+	else
+		// LOG
+		::oLOG:cHistorico := 'As configurações do verbo '+lower(cVerbo)+' do endpoint '+::cAPI+' não foram encontradas ('+cArqVerbo+').'
+		::oLOG:cStatus := '2'
+		cPrefixoLOG := '[ERROR]'
+	endif
+
+	if upper(cVerbo) <> "GET"
+		::oLOG:AlteraLOG(cPrefixoLOG)
+	endif
+
+	FWFreeObj(oDadosOrigem)
+	FWFreeObj(oBody)
+	FWFreeObj(oRest)
+	FWFreeObj(objRetorno)
+
+//
+return lRet
+
+
+/*/{Protheus.doc} TTLCAPICadastro.GravaID
+	Grava o ID Telecontrol na tabela e campo pertinente
+	@type  method
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+method GravaID(cValorID as character) as logical class TTLCAPICadastro
+local lRet := .F. as logical
+local AreaTab := (::cTabela)->(GetArea()) as array
+local bError
+local cError := "" as character
+
+	// posiciona no registro correto
+	(::cTabela)->(dbGoTo(::nRegistro))
+
+	if (::cTabela)->(Recno()) == ::nRegistro
+
+		bError := ErrorBlock({ |oError| cError := oError:Description})
+
+		Begin Sequence
+
+			if Reclock(::cTabela, .F.)
+				(::cTabela)->&(::cCampoID) := cValorID
+				lRet := .T.
+			endif
+
+		End Sequence
+
+		ErrorBlock(bError)
+
+		lRet := empty(cError)
+
+	endif
+
+	RestArea(AreaTab)
+
+return lRet 
+
+
+/*/{Protheus.doc} TTLCAPICadastro.New
+	Consulta o cadastro do Telecontrol
+	@type  method
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+method Consulta(xCodigo, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg as logical) as logical class TTLCAPICadastro
+local lRet := .F. as logical
+local objRetorno as object
+local cIDRetorno as character
+local cCodeIDRet as character
+local cArqPOST := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_post.json' as character
+local cCodigo := ''
+local cCodigo2 := ''
+
+default xCodigo := ''
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	cRetorno := ''
+	cCodeIDRet := ''
+
+	if (valtype(xCodigo) == "C")
+		cCodigo := xCodigo
+	elseif (valtype(xCodigo) == "A")
+		if len(xCodigo) > 0
+			cCodigo := xCodigo[1]
+		endif
+		if len(xCodigo) > 1
+			cCodigo2 := xCodigo[2]
+		endif
+	endif
+
+	if File(cArqPOST)
+		objRetorno := jsonObject():New()
+		objRetorno:fromJson(MemoRead(cArqPOST))
+		if objRetorno:HasProperty('returnID')
+			cCodeIDRet := objRetorno['returnID']
+		endif
+		objRetorno:fromJson('{}')
+		FWFreeObj(@objRetorno)
+	endif
+
+	if !empty(cCodigo)
+
+		lRet := ::CallApi('get', @cCodRet, @cRetorno, cCodigo, cCodigo2)
+		if lRet
+			// se a consulta retornou Ok, verifico se o ID está gravado do Protheus
+			if !empty(cCodeIDRet) .AND. ::lExisteCampoID
+
+				objRetorno := jsonObject():New()
+				objRetorno:fromJson(::oLOG:cJsonRetorno)
+				cIDRetorno := Eval(&(cCodeIDRet))
+				objRetorno:fromJson('{}')
+				FWFreeObj(@objRetorno)
+
+				if !empty(cIDRetorno) .AND. ((::cTabela)->&(::cCampoID) <> cIDRetorno)
+					::GravaID(cIDRetorno)
+				endif
+			endif
+			// se foi solicitado, apresento o registro na tela
+			if !isBlind() .AND. lMostraReg
+				::ExibeRetorno()
+			endif
+		else
+			// LOG
+			// tenta efetuar o tratamento da mensagem de retorno
+			objRetorno := jsonObject():New()
+			objRetorno:fromJson(cRetorno)
+			cRetorno := 'Erro ao efetuar a consulta no Telecontrol'
+
+			if objRetorno:HasProperty('exception') .AND. (objRetorno['exception'] == "Exception")
+				cRetorno := DecodeUTF8(objRetorno['message'])
+			endif
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Não foi possível efetuar a consulta. Mensagem:'+CRLF+CRLF+">> "+OemToAnsi(cRetorno)+" <<", 'Consulta no Telecontrol')
+			endif
+
+			objRetorno:fromJson('{}')
+			FWFreeObj(@objRetorno)
+		endif
+	else
+		// LOG
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Registro não encontrado no Protheus', 'Consulta no Telecontrol')
+		endif
+	endif
+//
+return lRet
+
+
+/*/{Protheus.doc} TTLCAPICadastro.New
+	Exibe o retorno de uma consulta ao Telecontrol na tela do Protheus
+	@type  method
+	@author Emerson Nascimento TwoIT
+	@since 16/03/2025
+	@version 1.000
+	@param nil
+	@example
+	(examples)
+	@see (links_or_references)
+/*/
+method ExibeRetorno() class TTLCAPICadastro
+local cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_SHOW.json' as character
+local lShowJson := File(cArqCFG)
+local objDados := jsonObject():New()
+local aNames as array
+local iNames as integer
+local cShowJson as character
+local nCampos as integer 
+local cTipoCampo as character
+local nValor as numeric
+local nDecimais as integer
+local lExistTelaApresentacao := ExistBlock('TLC_SHRET')// ExistBlock('Telecontrol.Funcoes.TLCApresentaConsulta')
+
+	objDados:fromJson(::oLOG:cJsonRetorno)
+
+	objShowJson := jsonObject():New()
+	if lShowJson
+		cShowJson := MemoRead(cArqCFG)
+	else
+		// monta a apresentação com base no retorno da consulta
+		aNames := objDados:GetNames()
+		nCampos := len(aNames)
+		cShowJson := "{"
+		for iNames := 1 to nCampos
+			cTipoCampo := valtype(objDados[aNames[iNames]])
+			if (cTipoCampo == "N")
+				nValor := objDados[aNames[iNames]]
+				nDecimais := val(cvaltochar((nValor - NoRound(nValor,0))))-2
+				if (nDecimais < 0)
+					nDecimais := 0
+				endif
+			else
+				nDecimais := 0
+			endif
+
+			cShowJson += ' "'+aNames[iNames]+'": {'
+			cShowJson += ' "titulo": "{|| '+"'"+aNames[iNames]+"'"+'))}",'
+			cShowJson += ' "dica": "{|| '+"'"+aNames[iNames]+"'"+'))}",'
+			cShowJson += ' "id": "{|| '+"'ID"+UPPER(aNames[iNames])+"'"+'))}",'
+			cShowJson += ' "tipo": "{|| '+"'"+cTipoCampo+"'"+'}",'
+			cShowJson += ' "tamanho": "{|| '+cvaltochar(len(objDados[aNames[iNames]])+2)+'}",'
+			cShowJson += ' "decimal": "{|| '+cvaltochar(nDecimais)+'}",'
+			cShowJson += ' "validacao": "{|| '+"FWBuildFeature(STRUCT_FEATURE_VALID, '')"+'}",'
+			cShowJson += ' "when": "{|| '+"''"+'}",'
+			cShowJson += ' "cbox": "{|| '+"''"+'}",'
+			cShowJson += ' "obrigatorio": "{|| .F.}"'
+			cShowJson += '}'
+			if (iNames < nCampos)
+				cShowJson += ", "
+			endif
+		next iNames
+		cShowJson += "}"
+	endif
+
+	objShowJson:fromJson(cShowJson)
+
+	// verifica se há campos de referência e monta a configuração da visualização
+	aNames := objShowJson:GetNames()
+	for iNames := 1 to len(aNames)
+		if objShowJson[aNames[iNames]]:HasProperty("referencia")
+			cCampo := ALLTRIM(objShowJson[aNames[iNames]]["referencia"])
+			objShowJson[aNames[iNames]]["titulo"] := "{|| '"+alltrim(GetSX3Cache(cCampo, 'X3_TITULO'))+"'}"
+			objShowJson[aNames[iNames]]["dica"] := "{|| '"+alltrim(GetSX3Cache(cCampo, 'X3_DESCRIC'))+"'}"
+			objShowJson[aNames[iNames]]["tipo"] := "{|| '"+GetSX3Cache(cCampo, 'X3_TIPO')+"'}"
+			objShowJson[aNames[iNames]]["tamanho"] := "{|| "+cValTochar(GetSX3Cache(cCampo, 'X3_TAMANHO'))+"}"
+			objShowJson[aNames[iNames]]["decimal"] := "{|| "+cValTochar(GetSX3Cache(cCampo, 'X3_DECIMAL'))+"}"
+			objShowJson[aNames[iNames]]["validacao"] := "{|| '"+alltrim(GetSX3Cache(cCampo, 'X3_VALID'))+"'}"
+			objShowJson[aNames[iNames]]["when"] := "{|| '"+alltrim(GetSX3Cache(cCampo, 'X3_WHEN'))+"'}"
+			objShowJson[aNames[iNames]]["cbox"] := "{|| '"+alltrim(GetSX3Cache(cCampo, 'X3_CBOX'))+"'}"
+			objShowJson[aNames[iNames]]["obrigatorio"] := "{|| .F.}"
+		endif
+	next iNames
+
+	if lExistTelaApresentacao
+		// monta a apresentação com base no arquivo de configuração
+		U_TLC_SHRET(::cDescricao, objDados, objShowJson)
+	else
+		FWAlertWarning('A rotina de apresentação da consulta não está compilada (TLC_SHRET). Entre em contato com o departamento de tecnologia', 'Consulta Telecontrol')
+	endif
+
+	objShowJson:fromJson('{}')
+	objDados:fromJson('{}')
+
+	FWFreeObj(@objShowJson)
+	FWFreeObj(@objDados)
+
+return
+

@@ -1,0 +1,908 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.OrdemServico
+using namespace Telecontrol.Classe
+
+class TTLCOrdemServico from TTLCAPICadastro
+
+	public data cDescricao as character
+	public data cTabelaItens as character
+	public data cTabelaAnexos as character
+	public data cPrefixoItens as character
+	public data cPrefixoAnexos as character
+
+	private data jCfgImportacao as json
+
+	public method CallApi() as logical
+	public method New() as object
+
+	// criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Consulta() as logical
+	public method Importa() as logical
+	public method ImportaOrdensServico() as logical
+	public method AvisoDeImportacaoDeOrdemServico() as logical
+
+endclass
+
+
+method New() as object class TTLCOrdemServico
+local aVerbos := {'PUT', 'GET', 'IMPORTA', 'POST'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+//local cArqSHOW as character
+local cDados as character
+local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as character
+//local cTabPrf := if(left(cTabelaOrdemServico,1)=="S",right(cTabelaOrdemServico,2),cTabelaOrdemServico) as character
+
+	_Super:New('ordemservico', cTabelaOrdemServico)
+	::cDescricao := "Ordem de serviço"
+
+	::cTabelaItens := alltrim(GetMV('TI_OSRITAB', .F., 'SZ8'))
+	::cTabelaAnexos := alltrim(GetMV('TI_OSRATAB', .F., 'SZ9'))
+	::cPrefixoItens := if(left(::cTabelaItens,1)=="S", right(::cTabelaItens,2), ::cTabelaItens)
+	::cPrefixoAnexos := if(left(::cTabelaAnexos,1)=="S", right(::cTabelaAnexos,2), ::cTabelaAnexos)
+	::jCfgImportacao := jsonObject():New()
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := alltrim(aVerbos[iVerbo])
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + lower(cVerbo) + '.json'
+
+		if (upper(cVerbo) == 'PUT') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração para confirmação de importação da ordem de serviço (informar ord.serv. importada)
+			cDados := '{' + CRLF
+			cDados += '	"exportado": "' + "{|| StrTran(FWTimeStamp(3, MSDATE()), 'T', ' ')" + '}",' + CRLF
+			cDados += '	"numeroOsSap": "{|| alltrim(' + ::cTabela + '->' + ::cPrefixoCampo + '_NUM)}"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória*/
+		elseif (upper(cVerbo) == 'GET') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta de ordem de serviço específica
+			// a leitura do endpoint retorna um array de ordens de serviço.
+			// o json abaixo trata dos dados de uma ordem de serviço
+			MemoWrite(cArqCFG, '{}')
+		elseif (upper(cVerbo) == 'POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para gravação de ordem de serviço específica
+			// o json abaixo trata dos dados de uma ordem de serviço
+			MemoWrite(cArqCFG, '{}')
+		elseif (upper(cVerbo) == 'IMPORTA') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta de ordem de serviço específica
+			// a leitura do endpoint retorna um array de ordens de serviço.
+			// o json abaixo trata dos dados de uma ordem de serviço
+			cDados := '{' + CRLF
+			cDados += '	"cabecalho": {' + CRLF
+			cDados += '		"campo": "os",' + CRLF
+			cDados += '		"cfg": {' + CRLF
+			cDados += '			"POSTO": "{|| cValToChar(oRest[' + "'os']['codigo_posto'" + '])}",' + CRLF
+			cDados += '			"NPOSTO": "{|| cValToChar(oRest[' + "'os']['nome_posto'" + '])}",' + CRLF
+			cDados += '			"XIDTLC": "{|| cValToChar(oRest[' + "'os']['os'" + '])}",' + CRLF
+			cDados += '			"NUM": "{|| cValToChar(oRest[' + "'os']['sua_os'" + '])}",' + CRLF
+			cDados += '			"DSTATUS": "{|| cValToChar(oRest[' + "'os']['status_os'" + '])}",' + CRLF
+			cDados += '			"DTABERT": "{|| ctod(if(empty(oRest[' + "'os']['data_abertura'" + ']), ' + "'  /  /  ', oRest[" + "'os']['data_abertura'" + ']))}",' + CRLF
+			cDados += '			"DTCONS": "{|| ctod(if(empty(oRest[' + "'os']['data_conserto'" + ']), ' + "'  /  /  ', oRest[" + "'os']['data_conserto'" + ']))}",' + CRLF
+			cDados += '			"DTFECHA": "{|| ctod(if(empty(oRest[' + "'os']['data_fechamento'" + ']), ' + "'  /  /  ', oRest[" + "'os']['data_fechamento'" + ']))}",' + CRLF
+			cDados += '			"DATEND": "{|| cValToChar(oRest[' + "'os']['tipo_atendimento'" + '])}",' + CRLF
+			cDados += '			"DTINST": "{|| ctod(if(empty(oRest[' + "'os']['data_instalacao'" + ']), ' + "'  /  /  ', oRest[" + "'os']['data_instalacao'" + ']))}",' + CRLF
+			cDados += '			"DTINTEG": "{|| MSDATE()}",' + CRLF
+			cDados += '			"HRINTEG": "{|| TIME()}",' + CRLF
+			cDados += '			"TIPO": "{|| cValToChar(oRest[' + "'os']['tipo_os'" + '])}",' + CRLF
+			cDados += '			"NUMREIN": "{|| cValToChar(oRest[' + "'os']['os_reincidente'" + '])}",' + CRLF
+			cDados += '			"PRODUTO": "{|| cValToChar(oRest[' + "'os']['produto_referencia'" + '])}",' + CRLF
+			cDados += '			"CLIENTE": "{|| cValToChar(oRest[' + "'os']['cod_cliente'" + '])}",' + CRLF
+			cDados += '			"LOJACLI": "{|| cValToChar(oRest[' + "'os']['cod_loja'" + '])}",' + CRLF
+			cDados += '			"LINHA": "{|| cValToChar(oRest[' + "'os']['linha'" + '])}",' + CRLF
+			cDados += '			"LINHAC": "{|| cValToChar(oRest[' + "'os']['linha_codigo'" + '])}",' + CRLF
+			cDados += '			"SERIE": "{|| cValToChar(oRest[' + "'os']['serie_produto'" + '])}",' + CRLF
+			cDados += '			"DEFEITO": "{|| cValToChar(oRest[' + "'os']['defeito_reclamado'" + '])}",' + CRLF
+			cDados += '			"CONSTAT": "{|| cValToChar(oRest[' + "'os']['defeito_constatado'" + '])}",' + CRLF
+			cDados += '			"GRPDEF": "{|| cValToChar(oRest[' + "'os']['produto_grupo_defeito_constatado'" + '])}",' + CRLF
+			cDados += '			"CNOME": "{|| cValToChar(oRest[' + "'os']['consumidor_nome'" + '])}",' + CRLF
+			cDados += '			"CFONE": "{|| cValToChar(oRest[' + "'os']['consumidor_fone'" + '])}",' + CRLF
+			cDados += '			"CFONEC": "{|| cValToChar(oRest[' + "'os']['consumidor_celular'" + '])}",' + CRLF
+			cDados += '			"CEMAIL": "{|| cValToChar(oRest[' + "'os']['consumidor_email'" + '])}",' + CRLF
+			cDados += '			"CCPF": "{|| cValToChar(oRest[' + "'os']['consumidor_cpf'" + '])}",' + CRLF
+			cDados += '			"CENDER": "{|| cValToChar(oRest[' + "'os']['consumidor_endereco'" + '])}",' + CRLF
+			cDados += '			"CNUM": "{|| cValToChar(oRest[' + "'os']['consumidor_numero'" + '])}",' + CRLF
+			cDados += '			"CCOMPL": "{|| cValToChar(oRest[' + "'os']['consumidor_complemento'" + '])}",' + CRLF
+			cDados += '			"CCEP": "{|| cValToChar(oRest[' + "'os']['consumidor_cep'" + '])}",' + CRLF
+			cDados += '			"CBAIRRO": "{|| cValToChar(oRest[' + "'os']['consumidor_bairro'" + '])}",' + CRLF
+			cDados += '			"CMUN": "{|| cValToChar(oRest[' + "'os']['consumidor_cidade'" + '])}",' + CRLF
+			cDados += '			"CEST": "{|| cValToChar(oRest[' + "'os']['consumidor_estado'" + '])}",' + CRLF
+			cDados += '			"REVENDA": "{|| cValToChar(oRest[' + "'os']['revenda'" + '])}",' + CRLF
+			cDados += '			"REVCNPJ": "{|| cValToChar(oRest[' + "'os']['revenda_cnpj'" + '])}",' + CRLF
+			cDados += '			"NOTA": "{|| cValToChar(oRest[' + "'os']['nota_fiscal'" + '])}",' + CRLF
+			cDados += '			"DATANF": "{|| ctod(if(empty(oRest[' + "'os']['data_nf'" + ']), ' + "'  /  /  ', oRest[" + "'os']['data_nf'" + ']))}",' + CRLF
+			cDados += '			"OBSER": "{|| cValToChar(oRest[' + "'os']['observacao_os'" + '])}",' + CRLF
+			cDados += '			"TOTAL": "{|| Val(oRest[' + "'os']['total_geral_os'" + '])}",' + CRLF
+			cDados += '			"CODMUN": "{|| cValToChar(oRest[' + "'os']['codigo_municipio'" + '])}",' + CRLF
+			cDados += '			"CONTRIB": "{|| cValToChar(oRest[' + "'os']['contribuinte'" + '])}",' + CRLF
+			cDados += '			"TECNICO": "{|| cValToChar(oRest[' + "'tecnico']['tecnico'" + '])}",' + CRLF
+			cDados += '			"DTECNIC": "{|| cValToChar(oRest[' + "'tecnico']['nome'" + '])}"' + CRLF
+			cDados += '		}' + CRLF
+			cDados += '	},' + CRLF
+			cDados += '	"itens": {' + CRLF
+			cDados += '		"campo": "pecas",' + CRLF
+			cDados += '		"cfg": {' + CRLF
+			cDados += '			"PRODUTO": "{|| cValToChar(oRest[' + "'pecas'][nPeca]['referencia'" + '])}",' + CRLF
+			cDados += '			"DESCRI": "{|| cValToChar(oRest[' + "'pecas'][nPeca]['descricao'" + '])}",' + CRLF
+			cDados += '			"QUANT": "{|| Val(oRest[' + "'pecas'][nPeca]['qtde'" + '])}",' + CRLF
+			cDados += '			"PRECO": "{|| Val(if(empty(oRest[' + "'pecas'][nPeca]['preco'" + ']),' + "'0'" + ',oRest[' + "'pecas'][nPeca]['preco'" + ']))}",' + CRLF
+			cDados += '			"SERVICO": "{|| cValToChar(oRest[' + "'pecas'][nPeca]['servico_realizado'" + '])}",' + CRLF
+			cDados += '			"TROCA": "{|| oRest[' + "'pecas'][nPeca]['troca_peca'" + '] == ' + "'sim'" + '}"' + CRLF
+			cDados += '		}' + CRLF
+			cDados += '	},' + CRLF
+			cDados += '	"anexos": {' + CRLF
+			cDados += '		"campo": "os_anexos",' + CRLF
+			cDados += '		"cfg": {' + CRLF
+			cDados += '			"DATA": "{|| ctod(if(empty(oRest[' + "'os_anexos'][nAnexo]['data'" + ']), ' + "'  /  /  ', oRest[" + "'os_anexos'][nAnexo]['data'" + ']))}",' + CRLF
+			cDados += '			"LINK": "{|| cValToChar(oRest[' + "'os_anexos'][nAnexo]['link'" + '])}",' + CRLF
+			cDados += '			"ARQ": "{|| cValToChar(oRest[' + "'os_anexos'][nAnexo]['filename'" + '])}",' + CRLF
+			cDados += '			"TAMANHO": "{|| oRest[' + "'os_anexos'][nAnexo]['filesize'" + ']}"' + CRLF
+			cDados += '		}' + CRLF
+			cDados += '	}' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := ''
+		endif
+	next iVerbo
+/*
+	// se necessário cria o arquivo para ser usado na consulta da ordem de serviço
+	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
+
+	if !File(cArqSHOW)
+		cDados := '{' + CRLF
+		cDados += '	"referencia": {' + CRLF
+		cDados += '		"referencia": "B1_COD"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"descricao": {' + CRLF
+		cDados += '		"referencia": "B1_DESC"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"codigoLinha": {' + CRLF
+		cDados += '		"referencia": "B5_CODLIN"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"codigoFamilia": {' + CRLF
+		cDados += '		"referencia": "B1_SUBGRP"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"garantia": {' + CRLF
+		cDados += '		"referencia": "B1_TGAR"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"numeroSerieObrigatorio": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Série obrigatória'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Número de série obrigatório'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ativo": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Ativo'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Produto Ativo?'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"'1=Sim;2=Não'"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"origem": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Origem'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Origem do produto'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 3}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"voltagem": {' + CRLF
+		cDados += '		"referencia": "B1_VOLT"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"ipi": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'IPI'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Alíquota de IPI'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 10}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"classificacaoFiscal": {' + CRLF
+		cDados += '		"referencia": "B1_CLASFIS"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"nomeComercial": {' + CRLF
+		cDados += '		"referencia": "B1_DESCNF"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"trocaObrigatoria": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'Troca obrigatória'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Troca de produto obrigatória ao abrir a OS'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 1}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"produto": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'ID Telecontrol'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'ID do produto no Telecontrol'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	}' + CRLF
+		cDados += '}' + CRLF
+		MemoWrite(cArqSHOW, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+*/
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCOrdemServico
+local lRet := .F. as logical
+local iHeader
+local oHeaderBlock as object
+local aHeaderAPI as array
+local cURIVerbo as character
+local cDescricao as character
+local cEndPoint as character
+local oRest as object
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	cVerbo := lower(cVerbo)
+	oHeaderBlock := ::oHeader
+
+	if cVerbo == 'importa' // importação tem tratamento específico
+
+		cURIVerbo := ::cURI
+
+		if ::oEndpoints:HasProperty(cVerbo)
+
+			if ::oEndpoints[cVerbo]:HasProperty('description')
+				cDescricao := ::oEndpoints[cVerbo]['description']
+			else
+				cDescricao := ::cAPI + ' ' + cVerbo
+			endif
+			if ::oEndpoints[cVerbo]:HasProperty('endpoint')
+				cEndpoint := Eval(&(::oEndpoints[cVerbo]['endpoint']))
+			else
+				cEndpoint := '/'
+			endif
+
+			// URI específica para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('uri')
+				cURIVerbo := ::oEndpoints[cVerbo]['uri']
+			endif
+
+			// header específico para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('header')
+				oHeaderBlock := ::oEndpoints[cVerbo]['header']
+			endif
+
+			if ::oEndpoints[cVerbo]:HasProperty('returnID')
+				::cTagID := ::oEndpoints[cVerbo]['returnID']
+			endif
+
+			// faz a montagem do header
+			aHeaderAPI := {}
+			cKey := ""
+			cValue := ""
+			for iHeader := 1 to len(oHeaderBlock)
+				cKey := oHeaderBlock[iHeader]['key']
+				cValue := Eval(&(oHeaderBlock[iHeader]['value']))
+
+				aAdd(aHeaderAPI, cKey + ":" + cValue)
+			next iHeader	
+
+			::oLOG:cDescricao := cDescricao
+			::oLOG:cURI := cURIVerbo
+			::oLOG:cEndpoint := alltrim(cEndpoint)
+			::oLOG:cVerbo := cVerbo
+
+			//Prepara o Rest.
+			oRest := FWREST():New(::oLOG:cURI)
+			if !empty(::oLOG:cEndpoint)
+				oRest:SetPath(::oLOG:cEndpoint)
+			endif
+
+			//faz a requisição ao endpoint
+			oRest:SetGetParams(::oLOG:cJsonEnvio)
+			lRet := oRest:Get(aHeaderAPI)
+
+			Begin Sequence
+				::oLOG:cJsonStatus := oRest:oResponseH:cStatusCode
+			End Sequence
+
+			::oLOG:cJsonRetorno := oRest:GetResult() // resultado melhor que :GetLastError()
+
+			cRetorno := ::oLOG:cJsonRetorno
+			cCodRet := ::oLOG:cJsonStatus
+
+		endif
+
+	else
+
+		lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta, cConsulta2)
+
+	endif
+
+return lRet
+
+
+method Importa(dDataInicial as date, dDataFinal as date, cCodRet as character, cRetorno as character) as logical class TTLCOrdemServico
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaTab := (::cTabela)->(GetArea()) as array
+local cDataInicial as character
+local cDataFinal as character
+local jsonOrdensDeServico as json
+local cArqCFG as character
+
+default dDataInicial := MSDATE() - GetMV('TI_DIASOS',.F.,10)
+default dDataFinal := MSDATE()
+default cCodRet := '500'
+default cRetorno := '{}'
+
+	::oLOG:cClasse := 'OrdemServico.TTLCOrdemServico.Importa'
+
+	lRet := chkFile(::cTabela)
+
+	if lRet // se conseguiu abrir a tabela
+		cDataInicial := left(FWTimeStamp(3, dDataInicial),10)
+		cDataFinal := left(FWTimeStamp(3, dDataFinal),10)
+
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('importa', @cCodRet, @cRetorno, cDataInicial, cDataFinal)
+
+		// se conseguiu o retorno da API, verifico se há ordens de serviço para importar
+		if lRet
+//			cRetorno := fTesteOS()
+
+			cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_importa.json'
+			::jCfgImportacao:fromJson(MemoRead(cArqCFG))
+
+			jsonOrdensDeServico := jsonObject():New()
+			jsonOrdensDeServico:fromJson(cRetorno)
+
+			if len(jsonOrdensDeServico['response']) > 0
+				// importa a ord.serv. diretamente para a tabela
+				::ImportaOrdensServico(jsonOrdensDeServico['response'])
+			endif
+
+			jsonOrdensDeServico:fromJson('{}')
+
+			FWFreeVar(@jsonOrdensDeServico)
+		endif
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Ordem de serviço não encontrada no Protheus', 'Consulta Ordem de Serviço no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaTab)
+
+return lRet
+
+
+method Consulta(cCodigo as character, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg as logical) as logical class TTLCOrdemServico
+local lRet := .F. as logical
+
+default cCodigo := (::cTabela)->B1_COD
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	::oLOG:cClasse := 'OrdemServico.TTLCOrdemServico.Consulta'
+
+	cRetorno := ''
+
+	if empty(cCodigo)
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Para efetuar a consulta é necessário informar o número da ordem de serviço Protheus', 'Consultar Ordem de Serviço no Telecontrol')
+		endif
+	else
+		(::cTabela)->(dbSetOrder(1)) // ??_FILIAL + ??_NUM
+		lRet := (::cTabela)->(dbSeek(xFilial() + cCodigo))
+
+		if lRet // se conseguiu posicionar no registro correto
+			::nRegistro := (::cTabela)->(Recno())
+			::oLOG:nRegistro := (::cTabela)->(Recno())
+			lRet := _Super:Consulta(cCodigo, @cCodRet, @cRetorno, lMostraMsg, lMostraReg)
+		else
+			// LOG
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Ordem de serviço não encontrado no Protheus', 'Consultar Ordem de Serviço no Telecontrol')
+			endif
+		endif
+	endif
+
+return lRet
+
+
+method ImportaOrdensServico(aOrdens as array, cCodRet as character, cRetorno as character) as logical class TTLCOrdemServico
+local iOrdem as numeric
+//local iPeca as numeric
+//local iAnexo as numeric
+local AreaTab := (::cTabela)->(GetArea()) as array
+local AreaIte := (::cTabelaItens)->(GetArea()) as array
+local AreaAnx := (::cTabelaAnexos)->(GetArea()) as array
+Local cItem as character
+Local iCpo as numeric
+Local nPeca as numeric
+Local nAnexo as numeric
+//Local jsonOrdemServico as json
+//Local jsonPeca as json
+//Local jsonAnexo as json
+Local lGravouOS as logical
+Local xConteudo
+Local nTamOS := TamSX3(::cPrefixoCampo+'_NUM')[1] as numeric
+
+Default cCodRet := '500'
+Default cRetorno := ''
+
+	(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_NUM
+
+	for iOrdem := 1 to len(aOrdens)
+
+//		jsonOrdemServico := aOrdens[iOrdem]
+		oRest := aOrdens[iOrdem]
+
+		aOSNames := ::jCfgImportacao['cabecalho']['cfg']:GetNames()
+		aItensNames := ::jCfgImportacao['itens']['cfg']:GetNames()
+		aAnexosNames := ::jCfgImportacao['anexos']['cfg']:GetNames()
+
+		// mantém somente os campos existentes na tabela de ordens de serviço
+		for iCpo := len(aOSNames) to 1 step -1
+			if (::cTabela)->(FieldPos(::cPrefixoCampo+'_'+aOSNames[iCpo])) == 0
+				aDel(aOSNames, iCpo)
+				aSize(aOSNames, len(aOSNames)-1)
+			endif
+		next iCpo
+
+		// mantém somente os campos existentes na tabela de itens das ordens de serviço
+		for iCpo := len(aItensNames) to 1 step -1
+			if (::cTabelaItens)->(FieldPos(::cPrefixoItens+'_'+aItensNames[iCpo])) == 0
+				aDel(aItensNames, iCpo)
+				aSize(aItensNames, len(aItensNames)-1)
+			endif
+		next iCpo
+
+		// mantém somente os campos existentes na tabela de anexos das ordens de serviço
+		for iCpo := len(aAnexosNames) to 1 step -1
+			if (::cTabelaAnexos)->(FieldPos(::cPrefixoAnexos+'_'+aAnexosNames[iCpo])) == 0
+				aDel(aAnexosNames, iCpo)
+				aSize(aAnexosNames, len(aAnexosNames)-1)
+			endif
+		next iCpo
+
+		cNumOrdemServico := Eval(&(::jCfgImportacao['cabecalho']['cfg']['NUM']))
+
+		// se a ordem de serviço ainda não foi integrada...
+		lGravouOS := (::cTabela)->(dbSeek(xFilial() + padr(cNumOrdemServico,nTamOS)))
+
+		if !lGravouOS
+
+			Begin Transaction
+
+				// grava o cabecalho da ordem de servico
+				Reclock(::cTabela, .T.)
+
+				for iCpo := 1 to len(aOSNames)
+					xConteudo := Eval(&(::jCfgImportacao['cabecalho']['cfg'][aOSNames[iCpo]]))
+					if !empty(xConteudo)
+						(::cTabela)->&(::cPrefixoCampo+'_'+aOSNames[iCpo]) := xConteudo
+					endif
+				next iCpo
+
+				(::cTabela)->&(::cPrefixoCampo+'_FILIAL') := xFilial(::cTabela)
+				(::cTabela)->&(::cPrefixoCampo+'_NUM') := cNumOrdemServico
+
+				(::cTabela)->(MSUnlock())
+
+				// grava os itens da ordem de serviço
+				if oRest:HasProperty(::jCfgImportacao['itens']['campo'])
+					cItem := Replicate('0', len((::cTabelaItens)->&(::cPrefixoItens+'_ITEM')))
+
+					for nPeca := 1 to len(oRest[::jCfgImportacao['itens']['campo']])
+
+						cItem := Soma1(cItem)
+
+						Reclock(::cTabelaItens, .T.)
+
+						for iCpo := 1 to len(aItensNames)
+							xConteudo := Eval(&(::jCfgImportacao['itens']['cfg'][aItensNames[iCpo]]))
+							if !empty(xConteudo)
+								(::cTabelaItens)->&(::cPrefixoItens+'_'+aItensNames[iCpo]) := xConteudo
+							endif
+						next iCpo
+
+						(::cTabelaItens)->&(::cPrefixoItens+'_FILIAL') := xFilial(::cTabelaItens)
+						(::cTabelaItens)->&(::cPrefixoItens+'_NUM') := cNumOrdemServico
+						(::cTabelaItens)->&(::cPrefixoItens+'_ITEM') := cItem
+
+						(::cTabelaItens)->(MSUnlock())
+
+					next iPeca
+				endif
+
+				// grava os anexos da ordem de serviço
+				if oRest:HasProperty(::jCfgImportacao['anexos']['campo'])
+
+					for nAnexo := 1 to len(oRest[::jCfgImportacao['anexos']['campo']])
+
+						Reclock(::cTabelaAnexos, .T.)
+
+						for iCpo := 1 to len(aAnexosNames)
+							xConteudo := Eval(&(::jCfgImportacao['anexos']['cfg'][aAnexosNames[iCpo]]))
+							if !empty(xConteudo)
+								(::cTabelaAnexos)->&(::cPrefixoAnexos+'_'+aAnexosNames[iCpo]) := xConteudo
+							endif
+						next iCpo
+
+						(::cTabelaAnexos)->&(::cPrefixoAnexos+'_FILIAL') := xFilial(::cTabelaAnexos)
+						(::cTabelaAnexos)->&(::cPrefixoAnexos+'_NUM') := cNumOrdemServico
+
+						(::cTabelaAnexos)->(MSUnlock())
+
+					next iPeca
+				endif
+
+				lGravouOS := .T.
+
+			End Transaction
+
+		endif
+
+		// se a OS foi gravada, preciso informar ao Telecontrol sobre a integração 
+		if lGravouOS
+			::AvisoDeImportacaoDeOrdemServico(cNumOrdemServico, @cCodRet, @cRetorno)
+		endif
+
+	next iOrdem
+
+	(::cTabela)->(RestArea(AreaAnx))
+	(::cTabela)->(RestArea(AreaIte))
+	(::cTabela)->(RestArea(AreaTab))
+
+return
+
+method AvisoDeImportacaoDeOrdemServico(cOrdemDeServico as character, cCodRet as character, cRetorno as character) as logical class TTLCOrdemServico
+local lRet as logical
+local AreaTabela := (::cTabela)->(GetArea())
+
+Default cCodRet := '500'
+Default cRetorno := ''
+
+	cOrdemDeServico := padr(cOrdemDeServico, TamSX3(::cPrefixoCampo+'_NUM')[1])
+
+	if cOrdemDeServico <> (::cTabela)->&(::cPrefixoCampo+'_NUM')
+		(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_NUM
+		(::cTabela)->(dbSeek(xFilial() + cOrdemDeServico))
+	endif
+
+	lRet := (cOrdemDeServico == (::cTabela)->&(::cPrefixoCampo+'_NUM'))
+
+	if lRet
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, cOrdemDeServico)
+	endif
+
+	(::cTabela)->(RestArea(AreaTabela))
+
+return lRet
+
+
+user function testeosrv(tipo as numeric)//Telecontrol.Integracao.OrdemServico.u_testeosrv(3)
+local oAPIOrdemServico := TTLCOrdemServico():New() as object
+local lRet := .F. as logical
+local cRetorno as character
+local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as character
+default tipo := 1
+
+	chkFile(cTabelaOrdemServico)
+
+	if tipo == 1
+		lRet := oAPIOrdemServico:Cadastra()
+	elseif tipo == 2
+		lRet := oAPIOrdemServico:Consulta(,,@cRetorno,,.T.)
+	elseif tipo == 3
+		lRet := oAPIOrdemServico:Importa(,,,@cRetorno)
+	endif
+
+	if lRet
+		if tipo == 1
+			alert('tudo certo')
+		else
+//			Alert(varinfo('Retorno', cRetorno))
+			Alert(cRetorno)
+		endif
+	else
+		alert('deu pau!')
+	endif
+
+return
+
+
+user function TLCImpOS(dDataInicial as date, dDataFinal as date)//Telecontrol.Integracao.OrdemServico.u_TLCImpOS()
+local oAPIOrdemServico := TTLCOrdemServico():New() as object
+local cRetorno as character
+local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as character
+
+	chkFile(cTabelaOrdemServico)
+	oAPIOrdemServico:Importa(,,,@cRetorno)
+	FWFreeObj(@oAPIOrdemServico)
+
+return
+
+
+static function fTesteOS()
+local cJsonTeste AS character
+
+	cJsonTeste := '{' + CRLF
+	cJsonTeste += '	"info": {' + CRLF
+	cJsonTeste += '		"page": 1,' + CRLF
+	cJsonTeste += '		"registers_per_page": 10,' + CRLF
+	cJsonTeste += '		"total_registers": 1' + CRLF
+	cJsonTeste += '	},' + CRLF
+	cJsonTeste += '	"response": [' + CRLF
+	cJsonTeste += '		{' + CRLF
+	cJsonTeste += '			"os": {' + CRLF
+	cJsonTeste += '				"codigo_posto": "121212",' + CRLF
+	cJsonTeste += '				"nome_posto": "Posto do Richard",' + CRLF
+	cJsonTeste += '				"os": 66985810,' + CRLF
+	cJsonTeste += '				"sua_os": "66985810",' + CRLF
+	cJsonTeste += '				"os_daikin": "",' + CRLF
+	cJsonTeste += '				"status_checkpoint": 2,' + CRLF
+	cJsonTeste += '				"status_os": "Aguardando Peças",' + CRLF
+	cJsonTeste += '				"data_abertura": "12/05/2025",' + CRLF
+	cJsonTeste += '				"data_conserto": null,' + CRLF
+	cJsonTeste += '				"data_fechamento": null,' + CRLF
+	cJsonTeste += '				"tipo_atendimento": "Garantia Deslocamento Domicílio",' + CRLF
+	cJsonTeste += '				"data_instalacao": null,' + CRLF
+	cJsonTeste += '				"data_exportacao": null,' + CRLF
+	cJsonTeste += '				"tipo_os": "Consumidor",' + CRLF
+	cJsonTeste += '				"os_reincidente": null,' + CRLF
+	cJsonTeste += '				"produto_referencia": "121212",' + CRLF
+	cJsonTeste += '				"produto_descricao": "Produto de teste",' + CRLF
+	cJsonTeste += '				"cod_cliente": null,' + CRLF
+	cJsonTeste += '				"cod_loja": null,' + CRLF
+	cJsonTeste += '				"linha": "Linha",' + CRLF
+	cJsonTeste += '				"linha_codigo": "01",' + CRLF
+	cJsonTeste += '				"serie_produto": null,' + CRLF
+	cJsonTeste += '				"defeito_reclamado": "Não liga",' + CRLF
+	cJsonTeste += '				"defeito_constatado": null,' + CRLF
+	cJsonTeste += '				"produto_grupo_defeito_constatado": null,' + CRLF
+	cJsonTeste += '				"consumidor_nome": "RICHARD WENDEL",' + CRLF
+	cJsonTeste += '				"consumidor_fone": "",' + CRLF
+	cJsonTeste += '				"consumidor_celular": "(14) 99888-8888",' + CRLF
+	cJsonTeste += '				"consumidor_email": "",' + CRLF
+	cJsonTeste += '				"consumidor_cpf": "50927190877",' + CRLF
+	cJsonTeste += '				"consumidor_endereco": "RUA DOUTOR JOAQUIM DE ABREU SAMPAIO VIDAL",' + CRLF
+	cJsonTeste += '				"consumidor_numero": "234",' + CRLF
+	cJsonTeste += '				"consumidor_complemento": "",' + CRLF
+	cJsonTeste += '				"consumidor_cep": "17504400",' + CRLF
+	cJsonTeste += '				"consumidor_bairro": "JARDIM DOM FREI DANIEL TOMASELLA",' + CRLF
+	cJsonTeste += '				"consumidor_cidade": "MARILIA",' + CRLF
+	cJsonTeste += '				"consumidor_estado": "SP",' + CRLF
+	cJsonTeste += '				"cod_ibge": 3529005,' + CRLF
+	cJsonTeste += '				"revenda": "CASA SOL NASCENTE",' + CRLF
+	cJsonTeste += '				"revenda_cnpj": "24413825000104",' + CRLF
+	cJsonTeste += '				"nota_fiscal": "324324324",' + CRLF
+	cJsonTeste += '				"data_nf": "12/05/025",' + CRLF
+	cJsonTeste += '				"observacao_os": " - Ordem de Serviço aberta pelo CallCenter, atendimento 13306600",' + CRLF
+	cJsonTeste += '				"total_geral_os": "0.00",' + CRLF
+	cJsonTeste += '				"data_nascimento": null,' + CRLF
+	cJsonTeste += '				"codigo_municipio": null,' + CRLF
+	cJsonTeste += '				"inscricao_estadual": null,' + CRLF
+	cJsonTeste += '				"contribuinte": null' + CRLF
+	cJsonTeste += '			},' + CRLF
+	cJsonTeste += '			"pecas": [' + CRLF
+	cJsonTeste += '				{' + CRLF
+	cJsonTeste += '					"referencia": "100",' + CRLF
+	cJsonTeste += '					"descricao": "Peça 1",' + CRLF
+	cJsonTeste += '					"qtde": "1",' + CRLF
+	cJsonTeste += '					"preco": null,' + CRLF
+	cJsonTeste += '					"servico_realizado": "Troca de Peça (gera pedido)",' + CRLF
+	cJsonTeste += '					"troca_peca": "sim"' + CRLF
+	cJsonTeste += '				}' + CRLF
+	cJsonTeste += '			],' + CRLF
+	cJsonTeste += '			"os_anexos": [' + CRLF
+	cJsonTeste += '				{' + CRLF
+	cJsonTeste += '					"data": "26/05/2025",' + CRLF
+	cJsonTeste += '					"link": "https://api2.telecontrol.com.br/tdocs/document/id/43cab31a956d23e6147fbe7ba62f1edf2cd38cf611cc363329fc9e719180c961",' + CRLF
+	cJsonTeste += '					"filename": "vista_explodida_pecas_p_chave_de_impacto_a_bateria_makita_dtw281_107954_1_20190710111722.webp",' + CRLF
+	cJsonTeste += '					"filesize": 83310' + CRLF
+	cJsonTeste += '				}' + CRLF
+	cJsonTeste += '			],' + CRLF
+	cJsonTeste += '			"tecnico": {' + CRLF
+	cJsonTeste += '				"tecnico": 51805,' + CRLF
+	cJsonTeste += '				"nome": "Richard"' + CRLF
+	cJsonTeste += '			}' + CRLF
+	cJsonTeste += '		}' + CRLF
+	cJsonTeste += '	]' + CRLF
+	cJsonTeste += '}' + CRLF
+
+return cJsonTeste
+
+/*
+{
+    "response": [
+        {
+            "os": {
+                "codigo_posto": "TESTE1234",
+                "nome_posto": "POSTO DE TESTES",
+                "os":60341956,
+                "sua_os": "60341956",
+                "os_fabrica": "",
+                "status_os": "Finalizada",
+                "data_abertura": "17/06/2022",
+                "data_conserto": "17/06/2022",
+                "data_fechamento": "17/06/2022",
+                "tipo_atendimento": "Garantia",
+                "data_instalacao": "17/06/2022",
+                "data_exportacao": null,
+                "tipo_os": "Consumidor",
+                "os_reincidente": null,
+                "produto_referencia": "2MXS18PMVM",
+                "produto_descricao": "UNIDADE CONDENSADORA TIPO MULTI QUENTE E FRIO - 18.000 BTU/H",
+                "armazem": "",
+                "cod_cliente": "",
+                "cod_loja": "",
+                "linha": "RESIDENCIAL",
+                "serie_produto": "F0123459",
+                "defeito_reclamado": "Não Liga",
+                "defeito_constatado": "Rendimento Insatisfatório",
+                "produto_grupo_defeito_constatado": "Compressor",
+                "consumidor_nome": "TELECONTROL",
+                "consumidor_fone": "1434156588",
+                "consumidor_email": "joao.junior@telecontrol.com.br",
+                "consumidor_cpf": "34339433039",
+                "revenda": "COMERCIAL CHAU KAN LTDA",
+                "nota_fiscal": "474744",
+                "data_nf": "01/06/022",
+                "valores_adicionais": [
+                    {
+                        "outras despesas": "25.00"
+                    }
+                ],
+                "observacao_os": null
+            },
+            "troca": {
+                "nome_completo": "fábrica",
+                "responsavel": "xxxxxx",
+                "data": "17/06/2022",
+                "referencia": "2MXS18PMVM",
+                "descricao": "UNIDADE CONDENSADORA TIPO MULTI QUENTE E FRIO - 18",
+                "setor": "sac",
+                "modalidade_transporte": null,
+                "situacao_atendimento": null,
+                "causa_troca": "1    ",
+                "motivo_troca": "NÃO TEM PEÇAS",
+                "gerar_pedido": true,
+                "observacao": "teste",
+                "ressarcimento": false
+            },
+            "pecas": [
+                {
+                    "referencia": "1736054",
+                    "descricao": "SERPENTINA DO EVAPORADOR",
+                    "qtde": "1",
+                    "preco": null,
+                    "servico_realizado": "Cancelado",
+                    "troca_peca": "nao"
+                }
+            ],
+            "os_anexos": [
+                {
+                    "data": "17/06/2022",
+                    "link": "https://api2.telecontrol.com.br/tdocs/document/id/57be24bf3d37b43e7a12881e1375d43e75d19c89467a06e495e715a4d82a712d",
+                    "filename": "Assinatura.png",
+                    "filesize": 33970
+                },
+                {
+                    "data": "17/06/2022",
+                    "link": "https://api2.telecontrol.com.br/tdocs/document/id/0aa5cc62755174ff4a01102ffba17143b06ec84233e482e870bdc047a8493f0e",
+                    "filename": "download TESTE.jpg",
+                    "filesize": 6762
+                }
+            ],
+            "tecnico": {
+                "tecnico": 39950,
+                "nome": "Junior"
+            }
+        }
+    ]
+}
+
+*/
+
+
+/*
+
+// informação passada no dia 26/05/2025, via WhatsApp, pelo 
+
+{
+    "info": {
+        "page": 1,
+        "registers_per_page": 10,
+        "total_registers": 1
+    },
+    "response": [
+        {
+            "os": {
+                "codigo_posto": "121212",
+                "nome_posto": "Posto do Richard",
+                "os": 66985810,
+                "sua_os": "66985810",
+                "os_daikin": "",
+                "status_checkpoint": 2,
+                "status_os": "Aguardando Peças",
+                "data_abertura": "12/05/2025",
+                "data_conserto": null,
+                "data_fechamento": null,
+                "tipo_atendimento": "Garantia Deslocamento Domicílio",
+                "data_instalacao": null,
+                "data_exportacao": null,
+                "tipo_os": "Consumidor",
+                "os_reincidente": null,
+                "produto_referencia": "121212",
+                "produto_descricao": "Produto de teste",
+                "cod_cliente": null,
+                "cod_loja": null,
+                "linha": "Linha",
+                "linha_codigo": "01",
+                "serie_produto": null,
+                "defeito_reclamado": "Não liga",
+                "defeito_constatado": null,
+                "produto_grupo_defeito_constatado": null,
+                "consumidor_nome": "RICHARD WENDEL",
+                "consumidor_fone": "",
+                "consumidor_celular": "(14) 99888-8888",
+                "consumidor_email": "",
+                "consumidor_cpf": "50927190877",
+                "consumidor_endereco": "RUA DOUTOR JOAQUIM DE ABREU SAMPAIO VIDAL",
+                "consumidor_numero": "234",
+                "consumidor_complemento": "",
+                "consumidor_cep": "17504400",
+                "consumidor_bairro": "JARDIM DOM FREI DANIEL TOMASELLA",
+                "consumidor_cidade": "MARILIA",
+                "consumidor_estado": "SP",
+                "cod_ibge": 3529005,
+                "revenda": "CASA SOL NASCENTE",
+                "revenda_cnpj": "24413825000104",
+                "nota_fiscal": "324324324",
+                "data_nf": "12/05/025",
+                "observacao_os": " - Ordem de Serviço aberta pelo CallCenter, atendimento 13306600",
+                "total_geral_os": "0.00",
+                "data_nascimento": null,
+                "codigo_municipio": null,
+                "inscricao_estadual": null,
+                "contribuinte": null
+            },
+            "pecas": [
+                {
+                    "referencia": "100",
+                    "descricao": "Peça 1",
+                    "qtde": "1",
+                    "preco": null,
+                    "servico_realizado": "Troca de Peça (gera pedido)",
+                    "troca_peca": "sim"
+                }
+            ],
+            "os_anexos": [
+                {
+                    "data": "26/05/2025",
+                    "link": "https://api2.telecontrol.com.br/tdocs/document/id/43cab31a956d23e6147fbe7ba62f1edf2cd38cf611cc363329fc9e719180c961",
+                    "filename": "vista_explodida_pecas_p_chave_de_impacto_a_bateria_makita_dtw281_107954_1_20190710111722.webp",
+                    "filesize": 83310
+                }
+            ],
+            "tecnico": {
+                "tecnico": 51805,
+                "nome": "Richard"
+            }
+        }
+    ]
+}
+*/

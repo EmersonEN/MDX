@@ -1,0 +1,12 @@
+
+#define TCCON_PRODUTO			1
+#define TCCON_PECA				2
+#define TCCON_POSTO		    	3
+#define TCCON_SERIECONSUMIDOR	4
+#define TCCON_SERIEPRODUTO		5
+#define TCCON_SERIEREVENDA		6
+#define TCCON_CLIENTE			7
+
+
+#define TCEXEC_CADASTRO         1
+#define TCEXEC_CONSULTA         2

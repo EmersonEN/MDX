@@ -1,0 +1,263 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.Preco
+using namespace Telecontrol.Classe
+
+class TTLCPreco from TTLCAPICadastro
+
+	public method CallApi() as logical
+	public method New() as object
+
+    // criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Cadastra() as logical
+	public method Consulta() as logical
+	public method Altera() as logical
+
+endclass
+
+
+method New() as object class TTLCPreco
+local aVerbos := {'POST', 'PUT', 'GET'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+local cArqSHOW as character
+local cDados as character
+
+	_Super:New('precos', 'DA1')
+	::cDescricao := "Cadastro de Preços"
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := aVerbos[iVerbo]
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + cVerbo + '.json'
+
+		if (upper(cVerbo) == 'POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para o cadastro de um preço
+			cDados := '{' + CRLF
+			cDados += '	"siglaTabela": "{|| ALLTRIM(DA1->DA1_CODTAB)}",' + CRLF
+			cDados += '	"pecaReferencia": "{|| ALLTRIM(DA1->DA1_CODPRO)}",' + CRLF
+			cDados += '	"preco": "{|| DA1->DA1_PRCVEN}",' + CRLF
+			cDados += '	"returnID": "' + "{|| cValToChar(objRetorno['tabelaItem'])}" + '"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'PUT') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para alteração do Peca
+			cDados := '{' + CRLF
+			cDados += '	"preco": "{|| DA1->DA1_PRCVEN}"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória
+		elseif (upper(cVerbo) == 'GET') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para consulta do Peca
+			MemoWrite(cArqCFG, '{}')
+		endif
+	next iVerbo
+
+	// se necessário cria o arquivo para ser usado na consulta do preço
+	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
+
+	if !File(cArqSHOW)
+		cDados := '{' + CRLF
+		cDados += '	"tabelaItem": {' + CRLF
+		cDados += '		"titulo": "{|| '+"'ID Telecontrol'"+')}",' + CRLF
+		cDados += '		"dica": "{|| '+"'ID do preço no Telecontrol'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 15}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},' + CRLF
+		cDados += '	"tabela": {
+		cDados += '		"tag": "tabela",' + CRLF
+		cDados += '		"titulo": "{|| '+"'Tabela'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Código da tabela de preço'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 5}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},
+		cDados += '	"tabela": {
+		cDados += '		"tag": "siglaTabela",' + CRLF
+		cDados += '		"titulo": "{|| '+"'Nome Tabela'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Nome da tabela de preço'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 20}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},
+		cDados += '	"tabela": {
+		cDados += '		"tag": "descricao",' + CRLF
+		cDados += '		"titulo": "{|| '+"'Descricao da Tabela'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Descricao da tabela de preço'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 40}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	},
+		cDados += '	"preco": {'
+		cDados += '		"titulo": "{|| '+"'Preço'"+'}",' + CRLF
+		cDados += '		"dica": "{|| '+"'Preço'"+'}",' + CRLF
+		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
+		cDados += '		"tamanho": "{|| 10}",' + CRLF
+		cDados += '		"decimal": "{|| 0}",' + CRLF
+		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
+		cDados += '	}
+		MemoWrite(cArqSHOW, cDados)
+		cDados := '' // limpa a variável para otimizar o uso de memória
+	endif
+
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCPreco
+local lRet := .F. as logical
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta, cConsulta2)
+
+return lRet
+
+method Cadastra(xRegistro as variant, cCodRet as character) as logical class TTLCPreco
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaDA1 := DA1->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Preco.TTLCPreco.Cadastra'
+
+	if empty(xRegistro)
+		lRet := chkFile('DA1')
+	else
+		if valtype(xRegistro) == "C" .AND. (DA1->DA1_CODTAB + DA1->DA1_CODPRO) <> xRegistro // chave
+			DA1->(dbSetOrder(1))
+			lRet := DA1->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. DA1->(Recno()) <> xRegistro // registro
+			DA1->(dbGoTo(xRegistro))
+			lRet := (DA1->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet // se conseguiu posicionar no registro correto
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('post', @cCodRet, @cRetorno)
+	else
+		// LOG
+		if !IsBlind()
+			FWAlertError('Tabela/Preço não encontrado no Protheus', 'Cadastrar preço no Telecontrol')
+		endif
+	endif
+
+	DA1->(RestArea(AreaDA1))
+
+return lRet
+
+
+method Consulta(cCodigo, cCodRet as character, cRetorno as character, lMostraMsg as logical, lMostraReg AS logical) as logical class TTLCPreco
+local lRet := .F. as logical
+local AreaTab := (::cTabela)->(GetArea()) as array
+
+default cCodigo := (::cTabela)->DA1_CODTAB+(::cTabela)->DA1_CODPRO
+default cCodRet := '500'
+default lMostraMsg := .T.
+default lMostraReg := .F.
+
+	::oLOG:cClasse := 'Preco.TTLCPreco.Consulta'
+
+	cRetorno := ''
+
+	if !empty(cCodigo)
+		(::cTabela)->(dbSetOrder(1)) // DA1_FILIAL + DA1_CODTAB + DA1_CODPRO
+		lRet := (::cTabela)->(dbSeek(xFilial() + cCodigo))
+
+		if lRet // se conseguiu posicionar no registro correto
+			::nRegistro := (::cTabela)->(Recno())
+			::oLOG:nRegistro := (::cTabela)->(Recno())
+			lRet := _Super:Consulta({left(cCodigo,3), substring(cCodigo,4,len(cCodigo))}, @cCodRet, @cRetorno, lMostraMsg, lMostraReg)
+		else
+			// LOG
+			if !IsBlind() .AND. lMostraMsg
+				FWAlertError('Preço não encontrado no Protheus', 'Consultar preço no Telecontrol')
+			endif
+		endif
+
+	else
+		if !IsBlind() .AND. lMostraMsg
+			FWAlertError('Para efetuar a consulta é necessário informar o código da tabela e o código do produto do Protheus', 'Consultar preço no Telecontrol')
+		endif
+	endif
+
+	(::cTabela)->(RestArea(AreaTab))
+
+return lRet
+
+
+method Altera(xRegistro as variant, cCodRet as character) as logical class TTLCPreco
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaDA1 := DA1->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Preco.TTLCPreco.Altera'
+
+	if empty(xRegistro)
+		lRet := chkFile('DA1')
+	else
+		if valtype(xRegistro) == "C" .AND. DA1->(DA1_CODTAB + DA1_CODPRO) <> xRegistro // chave
+			DA1->(dbSetOrder(1))
+			lRet := DA1->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. DA1->(Recno()) <> xRegistro // registro
+			DA1->(dbGoTo(xRegistro))
+			lRet := (DA1->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet // se conseguiu posicionar no registro correto
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, DA1->DA1_CODTAB, DA1->DA1_CODPRO)
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Tabela/Preço não encontrado no Protheus', 'Consulta preço no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaDA1)
+
+return lRet
+
+
+user function testeprc(tipo)//Telecontrol.Integracao.Preco.u_testeprc(1)
+local oAPIPreco := TTLCPreco():New()
+local lRet := .F.
+local cRetorno as character
+default tipo = 1
+
+	chkFile('SB1')
+
+	if tipo == 1
+		lRet := oAPIPreco:Cadastra()
+	else
+		lRet := oAPIPreco:Consulta(,,@cRetorno,,.T.)
+	endif
+
+	if lRet
+		if tipo == 1
+			alert('tudo certo')
+		else
+//			Alert(varinfo('Retorno', cRetorno))
+			Alert(cRetorno)
+		endif
+	else
+		alert('deu pau!')
+	endif
+
+return
