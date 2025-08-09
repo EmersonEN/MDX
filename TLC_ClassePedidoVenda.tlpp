@@ -24,17 +24,19 @@ class TTLCPedidoVenda from TTLCAPICadastro
 endclass
 
 
-method New() as object class TTLCPedidoVenda
+method New(cNomeAPI as character, cTabelaPedidoVenda as character) as object class TTLCPedidoVenda
 local aVerbos := {'PUT', 'GET', 'IMPORTA', 'POST'} as array
 local iVerbo as numeric
 local cVerbo as character
 local cArqCFG as character
 //local cArqSHOW as character
 local cDados as character
-local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as character
+Default cNomeAPI := 'pedidovenda'
+Default cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA'))
+
 //local cTabPrf := if(left(cTabelaPedidoVenda,1)=="S",right(cTabelaPedidoVenda,2),cTabelaPedidoVenda) as character
 
-	_Super:New('pedidovenda', cTabelaPedidoVenda)
+	_Super:New(cNomeAPI, cTabelaPedidoVenda)
 	::cDescricao := "Pedido de venda"
 
 	::jCfgImportacao := jsonObject():New()
@@ -48,9 +50,9 @@ local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as characte
 			cDados := '{' + CRLF
 			cDados += '	"pedido": "{|| alltrim(SC5->C5_NUM)}",' + CRLF
 			cDados += '	"exportado": {' + CRLF
-			cDados += '		"date": "' + "{|| StrTran(FWTimeStamp(3, MSDATE()), 'T', ' ')" + '}",' + CRLF
-			cDados += '		"timezone_type": 3,' + CRLF
-			cDados += '		"timezone": "America/Sao_Paulo"' + CRLF
+			cDados += '		"date": "{|| cConsulta2}",' + CRLF
+			cDados += '		"timezone_type": "{|| 3}",' + CRLF
+			cDados += '		"timezone": "{|| '+"'America/Sao_Paulo'"+'}"' + CRLF
 			cDados += '	}' + CRLF
 			cDados += '}' + CRLF
 			MemoWrite(cArqCFG, cDados)
@@ -73,19 +75,21 @@ local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as characte
 			cDados += '	"itens": {' + CRLF
 			cDados += '		"campo": "itens",' + CRLF
 			cDados += '		"cfg": {' + CRLF
-			cDados += '			"EMP": "{|| cValToChar(oRest[' + "'cnpj'" + '])}",' + CRLF
+			cDados += '			"EMP": "{|| '+"'01'"+ '}",' + CRLF
+			cDados += '			"FIL": "{|| '+"'03'"+ '}",' + CRLF
 			cDados += '			"XIDPED": "{|| cValToChar(oRest[' + "'pedido'" + '])}",' + CRLF
+			cDados += '			"CLI": "{|| cValToChar(oRest[' + "'cnpj'" + '])}",' + CRLF
 			cDados += '			"EMIS": "{|| stod(left(cValToChar(oRest[' + "'data'" + ']),10))}",' + CRLF
 			cDados += '			"TPPED": "{|| cValToChar(oRest[' + "'codigo'" + '])}",' + CRLF
 			cDados += '			"COND": "{|| cValToChar(oRest[' + "'codigo_condicao'" + '])}",' + CRLF
 			cDados += '			"ENTREG": "{|| stod(left(cValToChar(oRest[' + "'entrega'" + ']),10))}",' + CRLF
 			cDados += '			"ACRESC": "{|| oRest[' + "'valor_adicional_fabricante'" + ']}",' + CRLF
+			cDados += '			"TPFRT": "{|| '+"'CIF'"+ '}",' + CRLF
 			cDados += '			"DESCON": "{|| oRest[' + "'valor_desconto_fabricante'" + ']}",' + CRLF
 			cDados += '			"XIDITE": "{|| cValToChar(oRest[' + "'itens'][iItem]['pedido_item'" + '])}",' + CRLF
 			cDados += '			"PROD": "{|| cValToChar(oRest[' + "'itens'][iItem]['referencia'" + '])}",' + CRLF
 			cDados += '			"QTDVEN": "{|| val(oRest[' + "'itens'][iItem]['qtde'" + '])}",' + CRLF
 			cDados += '			"PRCVEN": "{|| val(oRest[' + "'itens'][iItem]['preco'" + '])}",' + CRLF
-			cDados += '			"IPI": "{|| val(oRest[' + "'itens'][iItem]['ipi'" + '])}",' + CRLF
 			cDados += '			"XIDOS": "{|| cValToChar(oRest[' + "'itens'][iItem]['os'" + '])}"' + CRLF
 			cDados += '		}' + CRLF
 			cDados += '	}' + CRLF
@@ -368,14 +372,9 @@ return lRet
 
 method ImportaPedidosVenda(aPedidos as array, cCodRet as character, cRetorno as character) as logical class TTLCPedidoVenda
 local iPedido as numeric
-//local iPeca as numeric
-//local iAnexo as numeric
 local AreaTab := (::cTabela)->(GetArea()) as array
 local iCpo as numeric
 local iItem as numeric
-//local jsonPedidoVenda as json
-//local jsonPeca as json
-//local jsonAnexo as json
 local lGravouPed as logical
 local xConteudo
 local nTamPed := TamSX3(::cPrefixoCampo+'_XIDPED')[1] as numeric
@@ -397,7 +396,6 @@ Default cRetorno := ''
 
 	for iPedido := 1 to len(aPedidos)
 
-//		jsonPedidoVenda := aPedidos[iPedido]
 		oRest := aPedidos[iPedido]
 
 		// o pedido será gravado em tabela intermediária, para intregação em outro momento
@@ -447,7 +445,7 @@ Default cRetorno := ''
 
 return
 
-method AvisoDeImportacaoDePedidoVenda(cPedidoVenda as character, cCodRet as character, cRetorno as character) as logical class TTLCPedidoVenda
+method AvisoDeImportacaoDePedidoVenda(cPedidoVenda as character, cCodRet as character, cRetorno as character, cParametro as character) as logical class TTLCPedidoVenda
 local lRet as logical
 local AreaTabela := (::cTabela)->(GetArea())
 
@@ -456,8 +454,8 @@ Default cRetorno := ''
 
 	cPedidoVenda := padr(cPedidoVenda, TamSX3(::cPrefixoCampo+'_NUM')[1])
 
-	if cPedidoVenda <> (::cTabela)->&(::cPrefixoCampo+'_NUM')
-		(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_NUM
+	if (cPedidoVenda <> (::cTabela)->&(::cPrefixoCampo+'_NUM'))
+		(::cTabela)->(dbSetOrder(1)) // C5_FILIAL, C5_NUM
 		(::cTabela)->(dbSeek(xFilial() + cPedidoVenda))
 	endif
 
@@ -466,7 +464,7 @@ Default cRetorno := ''
 	if lRet
 		::nRegistro := (::cTabela)->(Recno())
 		::oLOG:nRegistro := (::cTabela)->(Recno())
-		lRet := ::CallApi('put', @cCodRet, @cRetorno, SC5->C5_XIDTLC)
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, (::cTabela)->&(::cPrefixoCampo+'_XIDTLC'), cParametro)
 	endif
 
 	(::cTabela)->(RestArea(AreaTabela))

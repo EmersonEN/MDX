@@ -536,8 +536,6 @@ return Self
 method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCAPICadastro
 local lRet := .F. as logical
 local cArqVerbo := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + cVerbo + '.json' as character
-local aNames as array
-local iNames as numeric
 local iHeader //as numeric
 local cURIVerbo := ::cURI as character
 local cDescricao as character
@@ -622,20 +620,11 @@ default cRetorno := ""
 			Begin Sequence
 
 				oDadosOrigem:fromJson(MemoRead(cArqVerbo))
-				aNames := oDadosOrigem:GetNames()
+				PreencheBody(oDadosOrigem, oBody, cConsulta, cConsulta2)
+				::oLOG:cJsonEnvio := oBody:toJson()
 
-				if len(aNames) > 0
-					for iNames := 1 to len(aNames)
-						if !(upper(aNames[iNames]) == upper("returnID")) // returnID não deve ser enviado
-							oBody[aNames[iNames]] := Eval(&(oDadosOrigem[aNames[iNames]]))
-						endif
-					next iNames
-
-					::oLOG:cJsonEnvio := oBody:toJson()
-
-					if upper(cVerbo) <> "GET"
-						::oLOG:AlteraLOG('[PREPARE]')
-					endif
+				if upper(cVerbo) <> "GET"
+					::oLOG:AlteraLOG('[PREPARE]')
 				endif
 
 			End Sequence
@@ -755,6 +744,28 @@ default cRetorno := ""
 
 //
 return lRet
+
+
+Static Function PreencheBody(oDadosOrigem, oBody, cConsulta as character, cConsulta2 as character)
+Local iNames as numeric
+Local aNames := oDadosOrigem:GetNames() as array
+
+	if len(aNames) > 0
+
+		for iNames := 1 to len(aNames)
+			if !(upper(aNames[iNames]) == upper("returnID")) // returnID não deve ser enviado
+				if valtype(oDadosOrigem[aNames[iNames]]) == 'J'
+					oBody[aNames[iNames]] := jsonObject():New()
+					PreencheBody(oDadosOrigem[aNames[iNames]], oBody[aNames[iNames]], cConsulta, cConsulta2)
+				else
+					oBody[aNames[iNames]] := Eval(&(oDadosOrigem[aNames[iNames]]))
+				endif
+			endif
+		next iNames
+
+	endif
+
+Return
 
 
 /*/{Protheus.doc} TTLCAPICadastro.GravaID

@@ -32,8 +32,6 @@ Private oLOG as object // := Telecontrol.Classe.TTLCLog():New()
 		endif
 		return
 	else
-		//cAliasLOG := oLOG:cAliasLOG
-
 		SetFunName('TLCMONIT')
 
 		dbSelectArea(oLOG:cAliasLOG)
