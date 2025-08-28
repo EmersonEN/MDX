@@ -134,7 +134,7 @@ Private oLOG as object
 	cQryAtualizaPed += "	"+RetSQLName('SC6')+" C6 "+CRLF
 	cQryAtualizaPed += "	ON C6.D_E_L_E_T_ = '' AND C6.C6_FILIAL = '" + cFilSC6 + "' "+CRLF
 	cQryAtualizaPed += "	AND C6.C6_NUM = C5.C5_NUM "+CRLF
-	cQryAtualizaPed += "	AND C6.C6_XIDITE = PED."+cCpoIDIte+" "+CRLF
+	cQryAtualizaPed += "	AND C6.C6_XIDTLC = PED."+cCpoIDIte+" "+CRLF
 	cQryAtualizaPed += "WHERE PED.D_E_L_E_T_ = ' ' "+CRLF
 	cQryAtualizaPed += "	AND PED."+cCpoFilial+" = '" + cFilPED + "' "+CRLF
 	cQryAtualizaPed += "	AND PED."+cCpoCodEmp+" = '" + cEmpAnt + "' "+CRLF
@@ -377,7 +377,7 @@ Local cErroPedido as character
 				aAdd(aItem, {'C6_PRODUTO', (cTabPV)->&(cPrfPV+'_PROD'), nil})
 				aAdd(aItem, {'C6_QTDVEN', (cTabPV)->&(cPrfPV+'_QTDVEN'), nil})
 				aAdd(aItem, {'C6_PRCVEN', (cTabPV)->&(cPrfPV+'_PRCVEN'), nil}) // Preço Unitário = De acordo com a nota de compra do cliente
-				aAdd(aItem, {'C6_XIDITE', (cTabPV)->&(cPrfPV+'_XIDITE'), nil})
+				aAdd(aItem, {'C6_XIDTLC', (cTabPV)->&(cPrfPV+'_XIDITE'), nil})
 				aAdd(aItem, {'C6_XIDOS', (cTabPV)->&(cPrfPV+'_XIDOS'), nil})
 				aAdd(aItem, {'C6_OPER', cTpOper, nil})
 				aAdd(aItem, {'C6_TES', cTES, nil})

@@ -89,7 +89,7 @@ local cDados as character
 	//		cDados += '	"codigoTabelaGarantia": "GAR",' + CRLF
 	//		cDados += '	"codigoTabelaVenda": "VEN",' + CRLF
 
-			cDados += '	"returnID": "'+"{|| cValTochar('posto')}"+'"'+ CRLF
+			cDados += '	"returnID": "'+"{|| cValTochar(objRetorno['posto'])}"+'"'+ CRLF
 			cDados += '}' + CRLF
 
 			MemoWrite(cArqCFG, cDados)
