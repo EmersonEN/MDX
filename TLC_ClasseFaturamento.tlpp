@@ -1,0 +1,492 @@
+#include "totvs.ch"
+#include "tlpp-core.th"
+#include "parmtype.ch"
+
+namespace Telecontrol.Integracao.Faturamento
+using namespace Telecontrol.Classe
+
+class TTLCFaturamento from TTLCAPICadastro
+
+	public data cDescricao as character
+
+	public method CallApi() as logical
+	public method New() as object
+
+	// criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
+
+	public method Cadastra() as logical
+	public method Cancela() as logical
+	private method MontaBodyFaturamento() as logical
+
+endclass
+
+
+method New(cNomeAPI as character, cTabelaFaturamento as character) as object class TTLCFaturamento
+local aVerbos := {'CADASTRA_POST', 'CANCELA_POST'} as array
+local iVerbo as numeric
+local cVerbo as character
+local cArqCFG as character
+local cDados as character
+Default cNomeAPI := 'faturamento'
+Default cTabelaFaturamento := 'SF2'
+
+	_Super:New(cNomeAPI, cTabelaFaturamento)
+	::cDescricao := "Faturamento"
+
+	for iVerbo := 1 to len(aVerbos)
+		cVerbo := alltrim(aVerbos[iVerbo])
+		cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_' + lower(cVerbo) + '.json'
+
+		if (upper(cVerbo) == 'CADASTRA_POST') .AND. !File(cArqCFG)
+			// cria O arquivo de configuração padrão para montagem dos dados de faturamento
+			// será gerado um envio por nota fiscal
+			// o json abaixo trata dos dados de uma nota fiscal
+			cDados := '{' + CRLF
+			cDados += '	"posto": "{|| GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + ')}",' + CRLF
+			cDados += '	"notaFiscal": "{|| SF2->F2_DOC}",' + CRLF
+			cDados += '	"serie": "{|| SF2->F2_SERIE}",' + CRLF
+			cDados += '	"emissao": "{|| left(FWTimeStamp(3, SF2->F2_EMISSAO),10)}",' + CRLF
+			cDados += '	"totalNota": "{|| alltrim(cValToChar(SF2->F2_VALBRUT))}",' + CRLF
+			cDados += '	"totalIpi": "{|| alltrim(cValToChar(SF2->F2_VALIPI))}",' + CRLF
+			cDados += '	"totalIcms": "{|| alltrim(cValToChar(SF2->F2_VALICM))}",' + CRLF
+			cDados += '	"cfop": "{|| ' +"''" + '}",' + CRLF // CFOP está na tabela de itens
+			cDados += '	"transportadora": "{|| SF2->F2_TRANSP}",' + CRLF
+			cDados += '	"valorFrete": "{|| alltrim(cValToChar(SF2->F2_FRETE))}",' + CRLF
+			cDados += '	"envio": "{||' +"''" + '}",' + CRLF // existe na MDX?
+			cDados += '	"codigoRastreio": "{|| ' +"''" + '}",' + CRLF // existe na MDX?
+			cDados += '	"itens": {' + CRLF
+			cDados += '		"pedido": "{|| GetAdvFVal(' + "'SC5','C5_XIDTLC',xFilial('SC5')+SD2->D2_PEDIDO,1" + ')}",' + CRLF
+			cDados += '		"pedidoItem": "{|| GetAdvFVal(' + "'SC6','C6_XIDTLC',xFilial('SC6')+SD2->(D2_PEDIDO+D2_ITEMPV),1" + ')}",' + CRLF
+			cDados += '		"peca": "{|| SD2->D2_COD}",' + CRLF
+			cDados += '		"quantidade": "{|| alltrim(cValToChar(SD2->D2_QUANT))}",' + CRLF
+			cDados += '		"preco": "{|| alltrim(cValToChar(SD2->D2_PRCVEN))}",' + CRLF
+			cDados += '		"baseIcms": "{|| alltrim(cValToChar(SD2->D2_BASEICM))}",' + CRLF
+			cDados += '		"valorIcms": "{|| alltrim(cValToChar(SD2->D2_VALICM))}",' + CRLF
+			cDados += '		"aliquotaIcms": "{|| alltrim(cValToChar(SD2->D2_PICM))}",' + CRLF
+			cDados += '		"baseIpi": "{|| alltrim(cValToChar(SD2->D2_BASEIPI))}",' + CRLF
+			cDados += '		"valorIpi": "{|| alltrim(cValToChar(SD2->D2_VALIPI))}",' + CRLF
+			cDados += '		"aliquotaIpi": "{|| alltrim(cValToChar(SD2->D2_IPI))}",' + CRLF
+			cDados += '		"baseSubsTributaria": "{|| alltrim(cValToChar(if(SD2->D2_ICMSRET>0,SD2->D2_BASEICM,0)))}",' + CRLF
+			cDados += '		"valorSubsTributaria": "{|| alltrim(cValToChar(SD2->D2_ICMSRET))}",' + CRLF
+			cDados += '		"pecaPedida": "{|| SD2->D2_COD}"' + CRLF
+			cDados += '	},' + CRLF
+			cDados += '	"returnID": "{|| cValToChar(objRetorno['+ "'faturamento'" + '])}"' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória*/
+		elseif (upper(cVerbo) == 'CANCELA_POST') .AND. !File(cArqCFG)
+			// cria um arquivo de configuração padrão para montagem dos dados de faturamento
+			// será gerado um envio por nota fiscal
+			// o json abaixo trata dos dados de uma nota fiscal
+			cDados := '{' + CRLF
+			cDados += '	"posto": "{|| GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + ')}",' + CRLF
+			cDados += '	"notaFiscal": "{|| SF2->F2_DOC}",' + CRLF
+			cDados += '	"serie": "{|| SF2->F2_SERIE}",' + CRLF
+			cDados += '}' + CRLF
+			MemoWrite(cArqCFG, cDados)
+			cDados := '' // limpa a variável para otimizar o uso de memória*/
+		endif
+	next iVerbo
+
+return Self
+
+
+method CallApi(cVerbo as character, cCodRet as character, cRetorno as character, cConsulta as character, cConsulta2 as character) as logical class TTLCFaturamento
+local lRet := .F. as logical
+local iHeader
+local oHeaderBlock as object
+local aHeaderAPI as array
+local cURIVerbo as character
+local cDescricao as character
+local cEndPoint as character
+local oRest as object
+local cPrefixoLOG := '' as character
+
+default cCodRet := '500'
+default cRetorno := ''
+
+	cVerbo := lower(cVerbo)
+	oHeaderBlock := ::oHeader
+
+	if cVerbo == 'cadastra_post' // tem tratamento específico
+
+		cURIVerbo := ::cURI
+
+		if ::oEndpoints:HasProperty(cVerbo)
+
+			if ::oEndpoints[cVerbo]:HasProperty('description')
+				cDescricao := ::oEndpoints[cVerbo]['description']
+			else
+				cDescricao := ::cAPI + ' ' + cVerbo
+			endif
+			if ::oEndpoints[cVerbo]:HasProperty('endpoint')
+				cEndpoint := Eval(&(::oEndpoints[cVerbo]['endpoint']))
+			else
+				cEndpoint := '/'
+			endif
+
+			// URI específica para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('uri')
+				cURIVerbo := ::oEndpoints[cVerbo]['uri']
+			endif
+
+			// header específico para o verbo
+			if ::oEndpoints[cVerbo]:HasProperty('header')
+				oHeaderBlock := ::oEndpoints[cVerbo]['header']
+			endif
+
+			if ::oEndpoints[cVerbo]:HasProperty('returnID')
+				::cTagID := ::oEndpoints[cVerbo]['returnID']
+			endif
+
+			// faz a montagem do header
+			aHeaderAPI := {}
+			cKey := ""
+			cValue := ""
+			for iHeader := 1 to len(oHeaderBlock)
+				cKey := oHeaderBlock[iHeader]['key']
+				cValue := Eval(&(oHeaderBlock[iHeader]['value']))
+
+				aAdd(aHeaderAPI, cKey + ":" + cValue)
+			next iHeader	
+
+			::oLOG:cDescricao := cDescricao
+			::oLOG:cURI := cURIVerbo
+			::oLOG:cEndpoint := alltrim(cEndpoint)
+			::oLOG:cVerbo := cVerbo
+			::oLOG:cJsonEnvio := ::MontaBodyFaturamento(cConsulta, cConsulta2)
+
+			//Prepara o Rest.
+			oRest := FWREST():New(::oLOG:cURI)
+			if !empty(::oLOG:cEndpoint)
+				oRest:SetPath(::oLOG:cEndpoint)
+			endif
+
+			//faz a requisição ao endpoint
+			oRest:SetPostParams(::oLOG:cJsonEnvio)
+			lRet := oRest:Post(aHeaderAPI)
+
+			Begin Sequence
+				::oLOG:cJsonStatus := oRest:oResponseH:cStatusCode
+			End Sequence
+
+			::oLOG:cJsonRetorno := oRest:GetResult() // resultado melhor que :GetLastError()
+
+			cRetorno := ::oLOG:cJsonRetorno
+			cCodRet := ::oLOG:cJsonStatus
+
+			if lRet .AND. ::lExisteCampoID .AND. !empty(::cTagID)
+				cRetJson := objRetorno:fromJson(::oLOG:cJsonRetorno)
+				::oLOG:cIDRegistro := Eval(&(::cTagID))
+
+				if valtype(cRetJson) == "U" // o retorno pôde ser lido
+					if ::GravaID(::oLOG:cIDRegistro)
+						::oLOG:cHistorico := 'Registro transmitido e ID gravado com sucesso'
+						::oLOG:cStatus := 'X'
+						cPrefixoLOG := '[SUCCESS]'
+					else
+						// LOG de transferência ok, mas não gravou o ID
+						::oLOG:cHistorico := 'Registro transmitido com sucesso, mas NÃO foi possível gravar o ID no registro'
+						::oLOG:cStatus := '3'
+						cPrefixoLOG := '[WARNING]'
+					endif
+				else
+					// LOG de transferência ok, mas não foi possível ler o json retorno
+					::oLOG:cHistorico := 'Registro transmitido com sucesso, mas o retorno não é um json válido (impossível obter o ID)'
+					::oLOG:cStatus := '4'
+					cPrefixoLOG := '[WARNING]'
+				endif
+			endif
+
+		endif
+
+	else
+
+		lRet := _Super:CallApi(cVerbo, @cCodRet, @cRetorno, cConsulta, cConsulta2)
+
+	endif
+
+	::oLOG:AlteraLOG(cPrefixoLOG)
+
+return lRet
+
+
+method Cadastra(cNotaFiscal as character, cSerie as character, cCodRet as character, cRetorno as character) as logical class TTLCFaturamento
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaTab := (::cTabela)->(GetArea()) as array
+//local jsonPedidosDeVenda as json
+//local cArqCFG as character
+
+default cNotaFiscal := SF2->F2_DOC
+default cSerie := SF2->F2_SERIE
+default cCodRet := '500'
+default cRetorno := '{}'
+
+	::oLOG:cClasse := 'Faturamento.TTLCFaturamento.Cadastra'
+
+	lRet := chkFile(::cTabela)
+
+	if lRet // se conseguiu abrir a tabela
+
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('cadastra_post', @cCodRet, @cRetorno, cNotaFiscal, cSerie)
+
+		// se conseguiu o retorno da API, informo o número do faturamento na nota fiscal
+		if lRet
+			TCSQLExec("UPDATE "+RetSQLName('SF2')+" SET F2_XIDTLC = '' WHERE D_E_L_E_T_ = ' ' AND F2_FILIAL = ' ' AND F2_DOC = ' ' AND F2_SERIE = ' '")
+		else
+			// preciso dar um jeito de enviar a informação em um momento posterior
+		endif
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Faturamento não encontrada no Protheus', 'Cadastra Faturamento no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaTab)
+
+return lRet
+
+
+method Cancela(cNotaFiscal as character, cSerie as character, cCodRet as character, cRetorno as character) as logical class TTLCFaturamento
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaTab := (::cTabela)->(GetArea()) as array
+//local jsonPedidosDeVenda as json
+//local cArqCFG as character
+
+default cNotaFiscal := SF2->F2_DOC
+default cSerie := SF2->F2_SERIE
+default cCodRet := '500'
+default cRetorno := '{}'
+
+	::oLOG:cClasse := 'Faturamento.TTLCFaturamento.Cancela'
+
+	lRet := chkFile(::cTabela)
+
+	if lRet // se conseguiu abrir a tabela
+
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('cancela_post', @cCodRet, @cRetorno, cNotaFiscal, cSerie)
+
+		// se conseguiu o retorno da API, indico que o cancelamento foi enviado
+		if lRet
+/*			cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_importa.json'
+			::jCfgImportacao:fromJson(MemoRead(cArqCFG))
+
+			jsonPedidosDeVenda := jsonObject():New()
+			jsonPedidosDeVenda:fromJson('{"response": ' + cRetorno + '}')
+
+			if len(jsonPedidosDeVenda['response']) > 0
+				// importa a ord.serv. diretamente para a tabela
+				::ImportaPedidosVenda(jsonPedidosDeVenda['response'])
+			endif
+
+			jsonPedidosDeVenda:fromJson('{}')
+
+			FWFreeVar(@jsonPedidosDeVenda)
+*/
+		else
+			// preciso da informação sobre a falha no envio do cancelado.
+			// o cancelamento precisa ser enviado
+		endif
+	else
+		// LOG
+		if !isBlind()
+			FWAlertError('Faturamento não encontrada no Protheus', 'Consulta Faturamento no Telecontrol')
+		endif
+	endif
+
+	RestArea(AreaTab)
+
+return lRet
+
+
+method MontaBodyFaturamento(cNotaFiscal as character, cSerie as character) as logical class TTLCFaturamento
+local cArqVerbo := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_cadastra_post.json' as character
+local AreaTab := (::cTabela)->(GetArea()) as array
+local jsonRetorno := jsonObject():New() as json
+local aItens := {} as array
+local aNFNames as array
+local iName as numeric
+local cFilTab := xFilial(::cTabela)
+local cFilSD2 := xFilial('SD2')
+local AreaSD2 := SD2->(GetArea())
+local oDadosOrigem := jsonObject():New() as json
+Default cNotaFiscal := SF2->F2_DOC
+Default cSerie := SF2->F2_SERIE
+
+	(::cTabela)->(dbSetOrder(1)) // F2_FILIAL, F2_DOC, F2_SERIE
+	if (SF2->F2_FILIAL <> cFilTab) .OR. (SF2->F2_DOC <> cNotaFiscal) .OR. (SF2->F2_SERIE <> cSerie)
+		 (::cTabela)->(dbSeek(cFilTab + cNotaFiscal + cSerie))
+	endif
+
+	if (SF2->F2_FILIAL = cFilTab) .AND. (SF2->F2_DOC = cNotaFiscal) .AND. (SF2->F2_SERIE = cSerie)
+		oDadosOrigem:fromJson(MemoRead(cArqVerbo))
+
+		// apenas uma nota por envio
+		aNFNames := oDadosOrigem:GetNames()
+		aItNames := oDadosOrigem['itens']:GetNames()
+
+		for iName := 1 to len(aNFNames)
+			if (aNFNames[iName] <> 'itens') .AND. (aNFNames[iName] <> 'returnID')
+				jsonRetorno[aNFNames[iName]] := Eval(&(oDadosOrigem[aNFNames[iName]]))
+			endif
+
+			if (aNFNames[iName] == 'returnID')
+				::cTagID := oDadosOrigem[aNFNames[iName]]
+			endif
+		next iName
+
+		SD2->(dbSetOrder(3)) // D2_FILIAL, D2_DOC, D2_SERIE
+		SD2->(dbSeek(cFilSD2 + SF2->F2_DOC + SF2->F2_SERIE))
+
+		while !SD2->(EOF()) .AND. (SD2->D2_FILIAL = cFilSD2) .AND. (SD2->D2_DOC = SF2->F2_DOC) .AND. (SD2->D2_SERIE = SF2->F2_SERIE)
+			aAdd(aItens, jsonObject():New())
+			nItem := len(aItens)
+			for iName := 1 to len(aItNames)
+				if (aItNames[iName] <> 'returnID')
+					aItens[nItem][aItNames[iName]] := Eval(&(oDadosOrigem['itens'][aItNames[iName]]))
+				endif
+			next iName
+
+			SD2->(dbSkip())
+		enddo
+
+		jsonRetorno['itens'] := aItens
+	endif
+
+	(::cTabela)->(RestArea(AreaTab))
+	SD2->(RestArea(AreaSD2))
+
+	oDadosOrigem:fromJson('{}')
+
+return jsonRetorno:toJson()
+
+/*
+method AvisoDeImportacaoDeFaturamento(cNotaFiscal as character, cCodRet as character, cRetorno as character, cParametro as character) as logical class TTLCFaturamento
+local lRet as logical
+local AreaTabela := (::cTabela)->(GetArea())
+
+Default cCodRet := '500'
+Default cRetorno := ''
+
+	cNotaFiscal := padr(cNotaFiscal, TamSX3(::cPrefixoCampo+'_NUM')[1])
+
+	if (cNotaFiscal <> (::cTabela)->&(::cPrefixoCampo+'_NUM'))
+		(::cTabela)->(dbSetOrder(1)) // C5_FILIAL, C5_NUM
+		(::cTabela)->(dbSeek(xFilial() + cNotaFiscal))
+	endif
+
+	lRet := (cNotaFiscal == (::cTabela)->&(::cPrefixoCampo+'_NUM'))
+
+	if lRet
+		::nRegistro := (::cTabela)->(Recno())
+		::oLOG:nRegistro := (::cTabela)->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, (::cTabela)->&(::cPrefixoCampo+'_XIDTLC'), cParametro)
+	endif
+
+	(::cTabela)->(RestArea(AreaTabela))
+
+return lRet
+*/
+
+
+user function TLCIncFat(cNotaFiscal as character, cSerie as character)//Telecontrol.Integracao.Faturamento.u_TLCIncFat()
+local oAPIFaturamento := TTLCFaturamento():New() as object
+local cCodRet as character
+local cRetorno as character
+local cTabelaFaturamento := 'SF2'
+Default cNotaFiscal := SF2->F2_DOC
+Default cSerie := SF2->F2_SERIE
+
+	chkFile(cTabelaFaturamento)
+	oAPIFaturamento:Cadastra(cNotaFiscal, cSerie, cCodRet, cRetorno)
+
+				//2025-05-01/dataFinal/2025-06-30
+	FWFreeObj(@oAPIFaturamento)
+
+return
+
+
+static function fTestePed()
+local cJsonTeste AS character
+//
+return cJsonTeste
+
+/* // pedidos NÃO exportados
+[
+    {
+        "pedido": 12157278,
+        "data": "2016-09-09 17:05:19.97444-03",
+        "cnpj": "22407532000180",
+        "codigo": "GAR",
+        "codigo_condicao": "002",
+        "entrega": null,
+        "exportado": null,
+        "valor_adicional_fabricante": 0,
+        "valor_desconto_fabricante": 0
+        "itens": [
+          {
+            "pedido_item": 454545,
+            "referencia": "PKI.5485",
+            "qtde": "1",
+            "preco": "10000",
+            "ipi": 1.00,
+            "os": 4652525
+          }
+        ]
+    }
+]
+*/
+
+/* // consulta pedido
+{
+  "dados": {
+    "pedido": {
+      "pedido": 30144271,
+      "data": "2018-06-19 09:29:55.738691-03",
+      "cnpj": "35457011000180",
+      "codigo": "GAR",
+      "codigo_condicao": "GAR",
+      "entrega": null,
+      "exportado": null,
+      "tipo_frete": null,
+      "valores_adicionais": null,
+      "transportadora": null,
+      "status_pedido": 18,
+      "status_descricao": "Aguardando aprovação"
+    },
+    "itens": [
+      {
+        "pedido_item": 55659465,
+        "referencia": "002",
+        "qtde": "1",
+        "preco": "1.5",
+        "ipi": "0",
+        "os": "49133789",
+        "qtde_cancelada": "0",
+        "qtde_faturada": "0",
+        "ref_produto": "003",
+        "des_produto": "Produto teste 3"
+      },
+      {
+        "pedido_item": 55659466,
+        "referencia": "003",
+        "qtde": "1",
+        "preco": "1.5",
+        "ipi": "0",
+        "os": "49133789",
+        "qtde_cancelada": "0",
+        "qtde_faturada": "0",
+        "ref_produto": "003",
+        "des_produto": "Produto teste 3"
+      }
+    ]
+  }
+}
+*/
