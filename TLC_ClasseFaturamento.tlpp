@@ -81,7 +81,7 @@ Default cTabelaFaturamento := 'SF2'
 			cDados := '{' + CRLF
 			cDados += '	"posto": "{|| GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + ')}",' + CRLF
 			cDados += '	"notaFiscal": "{|| SF2->F2_DOC}",' + CRLF
-			cDados += '	"serie": "{|| SF2->F2_SERIE}",' + CRLF
+			cDados += '	"serie": "{|| SF2->F2_SERIE}"' + CRLF
 			cDados += '}' + CRLF
 			MemoWrite(cArqCFG, cDados)
 			cDados := '' // limpa a variável para otimizar o uso de memória*/
