@@ -503,6 +503,18 @@ default tipo := 1
 return
 
 
+user function TLCImpPV()//Telecontrol.Integracao.PedidoVenda.u_TLCImpPV()
+local oAPIPedidoVenda := TTLCPedidoVenda():New() as object
+local cTabelaPedidoVenda := alltrim(GetMV('TI_PEDVTAB', .F., 'SZA')) as character
+
+	chkFile(cTabelaPedidoVenda)
+	oAPIPedidoVenda:Importa()
+				//2025-05-01/dataFinal/2025-06-30
+	FWFreeObj(@oAPIPedidoVenda)
+
+return
+
+
 user function TLCImpPed(dDataInicial as date, dDataFinal as date)//Telecontrol.Integracao.PedidoVenda.u_TLCImpPed()
 local oAPIPedidoVenda := TTLCPedidoVenda():New() as object
 local cRetorno as character
