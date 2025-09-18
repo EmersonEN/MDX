@@ -33,10 +33,8 @@ local aVerbos := {'PUT', 'GET', 'IMPORTA', 'POST'} as array
 local iVerbo as numeric
 local cVerbo as character
 local cArqCFG as character
-//local cArqSHOW as character
 local cDados as character
 local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as character
-//local cTabPrf := if(left(cTabelaOrdemServico,1)=="S",right(cTabelaOrdemServico,2),cTabelaOrdemServico) as character
 
 	_Super:New('ordemservico', cTabelaOrdemServico)
 	::cDescricao := "Ordem de serviço"
@@ -148,89 +146,7 @@ local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as charact
 			cDados := ''
 		endif
 	next iVerbo
-/*
-	// se necessário cria o arquivo para ser usado na consulta da ordem de serviço
-	cArqSHOW := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_show.json'
 
-	if !File(cArqSHOW)
-		cDados := '{' + CRLF
-		cDados += '	"referencia": {' + CRLF
-		cDados += '		"referencia": "B1_COD"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"descricao": {' + CRLF
-		cDados += '		"referencia": "B1_DESC"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"codigoLinha": {' + CRLF
-		cDados += '		"referencia": "B5_CODLIN"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"codigoFamilia": {' + CRLF
-		cDados += '		"referencia": "B1_SUBGRP"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"garantia": {' + CRLF
-		cDados += '		"referencia": "B1_TGAR"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"numeroSerieObrigatorio": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'Série obrigatória'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'Número de série obrigatório'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 1}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"ativo": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'Ativo'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'Produto Ativo?'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 1}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"'1=Sim;2=Não'"+'}"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"origem": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'Origem'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'Origem do produto'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 3}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"voltagem": {' + CRLF
-		cDados += '		"referencia": "B1_VOLT"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"ipi": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'IPI'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'Alíquota de IPI'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'C'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 10}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"classificacaoFiscal": {' + CRLF
-		cDados += '		"referencia": "B1_CLASFIS"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"nomeComercial": {' + CRLF
-		cDados += '		"referencia": "B1_DESCNF"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"trocaObrigatoria": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'Troca obrigatória'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'Troca de produto obrigatória ao abrir a OS'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'L'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 1}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
-		cDados += '	},' + CRLF
-		cDados += '	"produto": {' + CRLF
-		cDados += '		"titulo": "{|| '+"'ID Telecontrol'"+'}",' + CRLF
-		cDados += '		"dica": "{|| '+"'ID do produto no Telecontrol'"+'}",' + CRLF
-		cDados += '		"tipo": "{|| '+"'N'"+'}",' + CRLF
-		cDados += '		"tamanho": "{|| 15}",' + CRLF
-		cDados += '		"decimal": "{|| 0}",' + CRLF
-		cDados += '		"cbox": "{|| '+"''"+'}"' + CRLF
-		cDados += '	}' + CRLF
-		cDados += '}' + CRLF
-		MemoWrite(cArqSHOW, cDados)
-		cDados := '' // limpa a variável para otimizar o uso de memória
-	endif
-*/
 return Self
 
 
@@ -355,8 +271,6 @@ default cRetorno := '{}'
 
 		// se conseguiu o retorno da API, verifico se há ordens de serviço para importar
 		if lRet
-//			cRetorno := fTesteOS()
-
 			cArqCFG := ::oUtil:AddPathDelimiter(::cPastaCFG) + ::cAPI + '_importa.json'
 			::jCfgImportacao:fromJson(MemoRead(cArqCFG))
 
@@ -420,142 +334,175 @@ return lRet
 
 
 method ImportaOrdensServico(aOrdens as array, cCodRet as character, cRetorno as character) as logical class TTLCOrdemServico
-local iOrdem as numeric
-//local iPeca as numeric
-//local iAnexo as numeric
-local AreaTab := (::cTabela)->(GetArea()) as array
-local AreaIte := (::cTabelaItens)->(GetArea()) as array
-local AreaAnx := (::cTabelaAnexos)->(GetArea()) as array
+Local iOrdem as numeric
+Local lRetOS as logical
+Local AreaTab := (::cTabela)->(GetArea()) as array
+Local AreaIte := (::cTabelaItens)->(GetArea()) as array
+Local AreaAnx := (::cTabelaAnexos)->(GetArea()) as array
 Local cItem as character
 Local iCpo as numeric
 Local nPeca as numeric
 Local nAnexo as numeric
-//Local jsonOrdemServico as json
-//Local jsonPeca as json
-//Local jsonAnexo as json
 Local lGravouOS as logical
 Local xConteudo
 Local nTamOS := TamSX3(::cPrefixoCampo+'_NUM')[1] as numeric
+Local cNumOSTlc as character
+Local cOSCodRet := '500' as character
+Local cOSRetorno := '' as character
+Local oAPIOSUnica := TTLCOrdemServico():New() as object
+Local oRestUnica
 
 Default cCodRet := '500'
 Default cRetorno := ''
 
 	(::cTabela)->(dbSetOrder(1)) // ???_FILIAL, ???_NUM
 
+	aOSNames := ::jCfgImportacao['cabecalho']['cfg']:GetNames()
+	aItensNames := ::jCfgImportacao['itens']['cfg']:GetNames()
+	aAnexosNames := ::jCfgImportacao['anexos']['cfg']:GetNames()
+
+	// mantém somente os campos existentes na tabela de ordens de serviço
+	for iCpo := len(aOSNames) to 1 step -1
+		if (::cTabela)->(FieldPos(::cPrefixoCampo+'_'+aOSNames[iCpo])) == 0
+			aDel(aOSNames, iCpo)
+			aSize(aOSNames, len(aOSNames)-1)
+		endif
+	next iCpo
+
+	// mantém somente os campos existentes na tabela de itens das ordens de serviço
+	for iCpo := len(aItensNames) to 1 step -1
+		if (::cTabelaItens)->(FieldPos(::cPrefixoItens+'_'+aItensNames[iCpo])) == 0
+			aDel(aItensNames, iCpo)
+			aSize(aItensNames, len(aItensNames)-1)
+		endif
+	next iCpo
+
+	// mantém somente os campos existentes na tabela de anexos das ordens de serviço
+	for iCpo := len(aAnexosNames) to 1 step -1
+		if (::cTabelaAnexos)->(FieldPos(::cPrefixoAnexos+'_'+aAnexosNames[iCpo])) == 0
+			aDel(aAnexosNames, iCpo)
+			aSize(aAnexosNames, len(aAnexosNames)-1)
+		endif
+	next iCpo
+
+	// faz a leitura de cada uma das ordens de serviço
 	for iOrdem := 1 to len(aOrdens)
 
-//		jsonOrdemServico := aOrdens[iOrdem]
-		oRest := aOrdens[iOrdem]
+		cNumOSTlc := cValTochar(aOrdens[iOrdem]['os'])
 
-		aOSNames := ::jCfgImportacao['cabecalho']['cfg']:GetNames()
-		aItensNames := ::jCfgImportacao['itens']['cfg']:GetNames()
-		aAnexosNames := ::jCfgImportacao['anexos']['cfg']:GetNames()
+		lRetOS := oAPIOSUnica:CallApi('get', @cOSCodRet, @cOSRetorno, cNumOSTlc)
 
-		// mantém somente os campos existentes na tabela de ordens de serviço
-		for iCpo := len(aOSNames) to 1 step -1
-			if (::cTabela)->(FieldPos(::cPrefixoCampo+'_'+aOSNames[iCpo])) == 0
-				aDel(aOSNames, iCpo)
-				aSize(aOSNames, len(aOSNames)-1)
+		if lRetOS
+
+			oRestUnica := jsonObject():New()
+			oRestUnica:fromJson(cOSRetorno)
+
+			if oRestUnica:HasProperty('response') .AND. (valtype(oRestUnica['response']) == 'A') .AND. (len(oRestUnica['response']) > 0)
+				oRest := oRestUnica['response'][1]
 			endif
-		next iCpo
+		else
 
-		// mantém somente os campos existentes na tabela de itens das ordens de serviço
-		for iCpo := len(aItensNames) to 1 step -1
-			if (::cTabelaItens)->(FieldPos(::cPrefixoItens+'_'+aItensNames[iCpo])) == 0
-				aDel(aItensNames, iCpo)
-				aSize(aItensNames, len(aItensNames)-1)
-			endif
-		next iCpo
-
-		// mantém somente os campos existentes na tabela de anexos das ordens de serviço
-		for iCpo := len(aAnexosNames) to 1 step -1
-			if (::cTabelaAnexos)->(FieldPos(::cPrefixoAnexos+'_'+aAnexosNames[iCpo])) == 0
-				aDel(aAnexosNames, iCpo)
-				aSize(aAnexosNames, len(aAnexosNames)-1)
-			endif
-		next iCpo
-
-		cNumOrdemServico := Eval(&(::jCfgImportacao['cabecalho']['cfg']['NUM']))
-
-		// se a ordem de serviço ainda não foi integrada...
-		lGravouOS := (::cTabela)->(dbSeek(xFilial() + padr(cNumOrdemServico,nTamOS)))
-
-		if !lGravouOS
-
-			Begin Transaction
-
-				// grava o cabecalho da ordem de servico
-				Reclock(::cTabela, .T.)
-
-				for iCpo := 1 to len(aOSNames)
-					xConteudo := Eval(&(::jCfgImportacao['cabecalho']['cfg'][aOSNames[iCpo]]))
-					if !empty(xConteudo)
-						(::cTabela)->&(::cPrefixoCampo+'_'+aOSNames[iCpo]) := xConteudo
-					endif
-				next iCpo
-
-				(::cTabela)->&(::cPrefixoCampo+'_FILIAL') := xFilial(::cTabela)
-				(::cTabela)->&(::cPrefixoCampo+'_NUM') := cNumOrdemServico
-
-				(::cTabela)->(MSUnlock())
-
-				// grava os itens da ordem de serviço
-				if oRest:HasProperty(::jCfgImportacao['itens']['campo'])
-					cItem := Replicate('0', len((::cTabelaItens)->&(::cPrefixoItens+'_ITEM')))
-
-					for nPeca := 1 to len(oRest[::jCfgImportacao['itens']['campo']])
-
-						cItem := Soma1(cItem)
-
-						Reclock(::cTabelaItens, .T.)
-
-						for iCpo := 1 to len(aItensNames)
-							xConteudo := Eval(&(::jCfgImportacao['itens']['cfg'][aItensNames[iCpo]]))
-							if !empty(xConteudo)
-								(::cTabelaItens)->&(::cPrefixoItens+'_'+aItensNames[iCpo]) := xConteudo
-							endif
-						next iCpo
-
-						(::cTabelaItens)->&(::cPrefixoItens+'_FILIAL') := xFilial(::cTabelaItens)
-						(::cTabelaItens)->&(::cPrefixoItens+'_NUM') := cNumOrdemServico
-						(::cTabelaItens)->&(::cPrefixoItens+'_ITEM') := cItem
-
-						(::cTabelaItens)->(MSUnlock())
-
-					next iPeca
-				endif
-
-				// grava os anexos da ordem de serviço
-				if oRest:HasProperty(::jCfgImportacao['anexos']['campo'])
-
-					for nAnexo := 1 to len(oRest[::jCfgImportacao['anexos']['campo']])
-
-						Reclock(::cTabelaAnexos, .T.)
-
-						for iCpo := 1 to len(aAnexosNames)
-							xConteudo := Eval(&(::jCfgImportacao['anexos']['cfg'][aAnexosNames[iCpo]]))
-							if !empty(xConteudo)
-								(::cTabelaAnexos)->&(::cPrefixoAnexos+'_'+aAnexosNames[iCpo]) := xConteudo
-							endif
-						next iCpo
-
-						(::cTabelaAnexos)->&(::cPrefixoAnexos+'_FILIAL') := xFilial(::cTabelaAnexos)
-						(::cTabelaAnexos)->&(::cPrefixoAnexos+'_NUM') := cNumOrdemServico
-
-						(::cTabelaAnexos)->(MSUnlock())
-
-					next iPeca
-				endif
-
-				lGravouOS := .T.
-
-			End Transaction
+			oRest := jsonObject():New()
 
 		endif
 
-		// se a OS foi gravada, preciso informar ao Telecontrol sobre a integração 
-		if lGravouOS
-			::AvisoDeImportacaoDeOrdemServico(cNumOrdemServico, @cCodRet, @cRetorno)
+		if oRest:HasProperty('os')
+
+			if !oRest:HasProperty('pecas')
+				oRest['pecas'] := {}
+			endif
+
+			if !oRest:HasProperty('os_anexos')
+				oRest['os_anexos'] := {}
+			endif
+
+			if !oRest:HasProperty('tecnico')
+				oRest['tecnico'] := jsonObject():New()
+			endif
+
+			cNumOrdemServico := Eval(&(::jCfgImportacao['cabecalho']['cfg']['NUM']))
+
+			// se a ordem de serviço ainda não foi integrada...
+			lGravouOS := (::cTabela)->(dbSeek(xFilial() + padr(cNumOrdemServico,nTamOS)))
+
+			if !lGravouOS
+
+				Begin Transaction
+
+					// grava o cabecalho da ordem de servico
+					Reclock(::cTabela, .T.)
+
+					for iCpo := 1 to len(aOSNames)
+						xConteudo := Eval(&(::jCfgImportacao['cabecalho']['cfg'][aOSNames[iCpo]]))
+						if !empty(xConteudo)
+							(::cTabela)->&(::cPrefixoCampo+'_'+aOSNames[iCpo]) := xConteudo
+						endif
+					next iCpo
+
+					(::cTabela)->&(::cPrefixoCampo+'_FILIAL') := xFilial(::cTabela)
+					(::cTabela)->&(::cPrefixoCampo+'_NUM') := cNumOrdemServico
+
+					(::cTabela)->(MSUnlock())
+
+					// grava os itens da ordem de serviço
+					if oRest:HasProperty(::jCfgImportacao['itens']['campo'])
+						cItem := Replicate('0', len((::cTabelaItens)->&(::cPrefixoItens+'_ITEM')))
+
+						for nPeca := 1 to len(oRest[::jCfgImportacao['itens']['campo']])
+
+							cItem := Soma1(cItem)
+
+							Reclock(::cTabelaItens, .T.)
+
+							for iCpo := 1 to len(aItensNames)
+								xConteudo := Eval(&(::jCfgImportacao['itens']['cfg'][aItensNames[iCpo]]))
+								if !empty(xConteudo)
+									(::cTabelaItens)->&(::cPrefixoItens+'_'+aItensNames[iCpo]) := xConteudo
+								endif
+							next iCpo
+
+							(::cTabelaItens)->&(::cPrefixoItens+'_FILIAL') := xFilial(::cTabelaItens)
+							(::cTabelaItens)->&(::cPrefixoItens+'_NUM') := cNumOrdemServico
+							(::cTabelaItens)->&(::cPrefixoItens+'_ITEM') := cItem
+
+							(::cTabelaItens)->(MSUnlock())
+
+						next iPeca
+					endif
+
+					// grava os anexos da ordem de serviço
+					if oRest:HasProperty(::jCfgImportacao['anexos']['campo'])
+
+						for nAnexo := 1 to len(oRest[::jCfgImportacao['anexos']['campo']])
+
+							Reclock(::cTabelaAnexos, .T.)
+
+							for iCpo := 1 to len(aAnexosNames)
+								xConteudo := Eval(&(::jCfgImportacao['anexos']['cfg'][aAnexosNames[iCpo]]))
+								if !empty(xConteudo)
+									(::cTabelaAnexos)->&(::cPrefixoAnexos+'_'+aAnexosNames[iCpo]) := xConteudo
+								endif
+							next iCpo
+
+							(::cTabelaAnexos)->&(::cPrefixoAnexos+'_FILIAL') := xFilial(::cTabelaAnexos)
+							(::cTabelaAnexos)->&(::cPrefixoAnexos+'_NUM') := cNumOrdemServico
+
+							(::cTabelaAnexos)->(MSUnlock())
+
+						next iPeca
+					endif
+
+					lGravouOS := .T.
+
+				End Transaction
+
+			endif
+
+			// se a OS foi gravada, preciso informar ao Telecontrol sobre a integração 
+			if lGravouOS
+				::AvisoDeImportacaoDeOrdemServico(cNumOrdemServico, @cCodRet, @cRetorno)
+			endif
+
 		endif
 
 	next iOrdem
@@ -563,6 +510,8 @@ Default cRetorno := ''
 	(::cTabela)->(RestArea(AreaAnx))
 	(::cTabela)->(RestArea(AreaIte))
 	(::cTabela)->(RestArea(AreaTab))
+
+	FWFreeObj(@oAPIOSUnica)
 
 return
 
@@ -614,7 +563,6 @@ default tipo := 1
 		if tipo == 1
 			alert('tudo certo')
 		else
-//			Alert(varinfo('Retorno', cRetorno))
 			Alert(cRetorno)
 		endif
 	else
@@ -628,9 +576,11 @@ user function TLCImpOS(dDataInicial as date, dDataFinal as date)//Telecontrol.In
 local oAPIOrdemServico := TTLCOrdemServico():New() as object
 local cRetorno as character
 local cTabelaOrdemServico := alltrim(GetMV('TI_OSRVTAB', .F., 'SZ7')) as character
+local dDtIni := ctod('01/02/2025') as date
+local dDtFim := ctod('28/02/2025') as date
 
 	chkFile(cTabelaOrdemServico)
-	oAPIOrdemServico:Importa(,,,@cRetorno)
+	oAPIOrdemServico:Importa(dDtIni,dDtFim,,@cRetorno)
 	FWFreeObj(@oAPIOrdemServico)
 
 return

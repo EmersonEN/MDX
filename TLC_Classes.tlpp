@@ -467,10 +467,10 @@ local cStartPath := GetSrvProfString("Startpath","") as character
 		cDados += '	"ordemservico": {' + CRLF
 		cDados += '		"importa": {' + CRLF
 		cDados += '			"description": "Importação de ordens de serviço",' + CRLF
-		cDados += '			"endpoint": "{|| '+"'/os/ordem/dataInicio/' + cConsulta + '/dataFim/' + cConsulta2"+'}"' + CRLF
+		cDados += '			"endpoint": "{|| '+"'/os/ordem/exportado/false/dataInicio/' + cConsulta + '/dataFim/' + cConsulta2"+'}"' + CRLF
 		cDados += '		},' + CRLF
 		cDados += '		"get": {' + CRLF
-		cDados += '			"description": "Consulta o ordem de serviço",' + CRLF
+		cDados += '			"description": "Consulta uma ordem de serviço",' + CRLF
 		cDados += '			"endpoint": "{|| '+"'/os/ordem/os/' + cConsulta"+'}"' + CRLF
 		cDados += '		},' + CRLF
 		cDados += '		"put": {' + CRLF
@@ -648,6 +648,9 @@ default cRetorno := ""
 				elseif lower(left(::oLOG:cVerbo,3)) == 'put'
 					lRet := oRest:Put(aHeaderAPI, ::oLOG:cJsonEnvio)
 				elseif lower(left(::oLOG:cVerbo,3)) == 'get'
+					if ::oLOG:cJsonEnvio == '{}'
+						::oLOG:cJsonEnvio := ''
+					endif
 					oRest:SetGetParams(::oLOG:cJsonEnvio)
 					lRet := oRest:Get(aHeaderAPI)
 				elseif lower(left(::oLOG:cVerbo,6)) == 'delete'
