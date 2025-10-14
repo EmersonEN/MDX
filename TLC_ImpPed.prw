@@ -118,7 +118,7 @@ Private cFilSC6 := xFilial('SC6') as character
 Private cQryAtualizaPed as character
 Private oLOG as object
 
-	// atualiza os registros intermediários com os dados do pedido do Protheus
+	// query utilizada para atualizar os registros intermediários com os dados do pedido do Protheus
 	cQryAtualizaPed := "UPDATE PED SET "+CRLF
 	cQryAtualizaPed += "	PED."+cCpoPed+" = C5.C5_NUM, "+CRLF
 	cQryAtualizaPed += "	PED."+cCpoItem+" = COALESCE(C6.C6_ITEM,'XX'), "+CRLF
