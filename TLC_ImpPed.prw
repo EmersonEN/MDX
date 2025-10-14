@@ -122,8 +122,8 @@ Private oLOG as object
 	cQryAtualizaPed := "UPDATE PED SET "+CRLF
 	cQryAtualizaPed += "	PED."+cCpoPed+" = C5.C5_NUM, "+CRLF
 	cQryAtualizaPed += "	PED."+cCpoItem+" = COALESCE(C6.C6_ITEM,'XX'), "+CRLF
-	cQryAtualizaPed += "	PED."+cCpoDtInt+" = CASE WHEN PED."+cCpoDtInt+" = ' ' THEN CONVERT(VARCHAR(8), GETDATE(), 112) ELSE PED.ZA_DTINT END, "+CRLF
-	cQryAtualizaPed += "	PED."+cCpoHrInt+" = CASE WHEN PED."+cCpoHrInt+" = ' ' THEN CONVERT(VARCHAR(8), GETDATE(), 108) ELSE PED.ZA_HRINT END "+CRLF
+	cQryAtualizaPed += "	PED."+cCpoDtInt+" = CASE WHEN PED."+cCpoDtInt+" = ' ' THEN CONVERT(VARCHAR(8), GETDATE(), 112) ELSE PED."+cCpoDtInt+" END, "+CRLF
+	cQryAtualizaPed += "	PED."+cCpoHrInt+" = CASE WHEN PED."+cCpoHrInt+" = ' ' THEN CONVERT(VARCHAR(8), GETDATE(), 108) ELSE PED."+cCpoHrInt+" END "+CRLF
 	cQryAtualizaPed += "FROM "+CRLF
 	cQryAtualizaPed += "	"+cNmTab+" PED "+CRLF
 	cQryAtualizaPed += "INNER JOIN "+CRLF
@@ -378,7 +378,7 @@ Local cErroPedido as character
 				aAdd(aItem, {'C6_QTDVEN', (cTabPV)->&(cPrfPV+'_QTDVEN'), nil})
 				aAdd(aItem, {'C6_PRCVEN', (cTabPV)->&(cPrfPV+'_PRCVEN'), nil}) // Preço Unitário = De acordo com a nota de compra do cliente
 				aAdd(aItem, {'C6_XIDTLC', (cTabPV)->&(cPrfPV+'_XIDITE'), nil})
-				aAdd(aItem, {'C6_XIDOS', (cTabPV)->&(cPrfPV+'_XIDOS'), nil})
+				aAdd(aItem, {'C6_XIDOS', (cTabPV)->&(cPrfPV+'_IDOS'), nil})
 				aAdd(aItem, {'C6_OPER', cTpOper, nil})
 				aAdd(aItem, {'C6_TES', cTES, nil})
 				aAdd(aItem, {'C6_LOCAL', cLocal, nil})
