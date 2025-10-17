@@ -13,6 +13,7 @@ class TTLCPeca from TTLCAPICadastro
     // criar um campo para ID Telecontrol em todos os cadastros ( [x]xx_XIDTLC )
 
 	public method Cadastra() as logical
+	public method Altera() as logical
 	public method Consulta() as logical
 
 endclass
@@ -225,6 +226,7 @@ default cRetorno := ''
 
 return lRet
 
+
 method Cadastra(xRegistro as variant, cCodRet as character) as logical class TTLCPeca
 local lRet := .F. as logical
 local cRetorno := "" as character
@@ -265,6 +267,56 @@ default cCodRet := '500'
 		// LOG
 		if !IsBlind()
 			FWAlertError('Peça não encontrada no Protheus', 'Cadastrar peça no Telecontrol')
+		endif
+	endif
+
+	SB1->(RestArea(AreaSB1))
+	SB2->(RestArea(AreaSB2))
+	SB5->(RestArea(AreaSB5))
+
+return lRet
+
+
+method Altera(xRegistro as variant, cCodRet as character) as logical class TTLCPeca
+local lRet := .F. as logical
+local cRetorno := "" as character
+local AreaSB1 := SB1->(GetArea()) as array
+local AreaSB2 := SB2->(GetArea()) as array
+local AreaSB5 := SB5->(GetArea()) as array
+
+default cCodRet := '500'
+
+	::oLOG:cClasse := 'Peca.TTLCPeca.Altera'
+
+	if empty(xRegistro)
+		lRet := chkFile('SB1')
+	else
+		if valtype(xRegistro) == "C" .AND. SB1->B1_COD <> xRegistro // chave
+			SB1->(dbSetOrder(1))
+			lRet := SB1->(dbSeek(xFilial() + xRegistro))
+		elseif valtype(xRegistro) == "N" .AND. SB1->(Recno()) <> xRegistro // registro
+			SB1->(dbGoTo(xRegistro))
+			lRet := (SB1->(Recno()) == xRegistro)
+		endif
+	endif
+
+	if lRet // se conseguiu posicionar no registro correto
+		if SB2->B2_COD <> SB1->B1_COD // ALMOXARIFADO ????
+			SB2->(dbSetOrder(1)) // B2_FILIAL, B2_COD, B2_LOCAL
+			SB2->(dbSeek(xFilial() + SB1->B1_COD))
+		endif
+		if SB5->B5_COD <> SB1->B1_COD
+			SB5->(dbSetOrder(1)) // B5_FILIAL, B5_COD
+			SB5->(dbSeek(xFilial() + SB1->B1_COD))
+		endif
+
+		::nRegistro := SB1->(Recno())
+		::oLOG:nRegistro := SB1->(Recno())
+		lRet := ::CallApi('put', @cCodRet, @cRetorno)
+	else
+		// LOG
+		if !IsBlind()
+			FWAlertError('Peça não encontrada no Protheus', 'Alterar peça no Telecontrol')
 		endif
 	endif
 

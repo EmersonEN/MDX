@@ -273,7 +273,7 @@ Local cErroPedido as character
 
 		else
 
-			(cTabPV)->(dbSetOrder(1)) // _FILIAL, _XIDPED
+			(cTabPV)->(dbSetOrder(2)) // _FILIAL, _XIDPED
 			(cTabPV)->(dbSeek(cFilPED + cIDPedidoVenda))
 
 			aCabec := {}

@@ -42,22 +42,22 @@ Default cTabelaFaturamento := 'SF2'
 			// será gerado um envio por nota fiscal
 			// o json abaixo trata dos dados de uma nota fiscal
 			cDados := '{' + CRLF
-			cDados += '	"posto": "{|| GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + ')}",' + CRLF
-			cDados += '	"notaFiscal": "{|| SF2->F2_DOC}",' + CRLF
-			cDados += '	"serie": "{|| SF2->F2_SERIE}",' + CRLF
+			cDados += '	"posto": "{|| alltrim(GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + '))}",' + CRLF
+			cDados += '	"notaFiscal": "{|| alltrim(SF2->F2_DOC)}",' + CRLF
+			cDados += '	"serie": "{|| alltrim(SF2->F2_SERIE)}",' + CRLF
 			cDados += '	"emissao": "{|| left(FWTimeStamp(3, SF2->F2_EMISSAO),10)}",' + CRLF
 			cDados += '	"totalNota": "{|| alltrim(cValToChar(SF2->F2_VALBRUT))}",' + CRLF
 			cDados += '	"totalIpi": "{|| alltrim(cValToChar(SF2->F2_VALIPI))}",' + CRLF
 			cDados += '	"totalIcms": "{|| alltrim(cValToChar(SF2->F2_VALICM))}",' + CRLF
 			cDados += '	"cfop": "{|| ' +"''" + '}",' + CRLF // CFOP está na tabela de itens
-			cDados += '	"transportadora": "{|| SF2->F2_TRANSP}",' + CRLF
+			cDados += '	"transportadora": "{|| alltrim(SF2->F2_TRANSP)}",' + CRLF
 			cDados += '	"valorFrete": "{|| alltrim(cValToChar(SF2->F2_FRETE))}",' + CRLF
 			cDados += '	"envio": "{||' +"''" + '}",' + CRLF // existe na MDX?
 			cDados += '	"codigoRastreio": "{|| ' +"''" + '}",' + CRLF // existe na MDX?
 			cDados += '	"itens": {' + CRLF
-			cDados += '		"pedido": "{|| GetAdvFVal(' + "'SC5','C5_XIDTLC',xFilial('SC5')+SD2->D2_PEDIDO,1" + ')}",' + CRLF
-			cDados += '		"pedidoItem": "{|| GetAdvFVal(' + "'SC6','C6_XIDTLC',xFilial('SC6')+SD2->(D2_PEDIDO+D2_ITEMPV),1" + ')}",' + CRLF
-			cDados += '		"peca": "{|| SD2->D2_COD}",' + CRLF
+			cDados += '		"pedido": "{|| alltrim(GetAdvFVal(' + "'SC5','C5_XIDTLC',xFilial('SC5')+SD2->D2_PEDIDO,1" + '))}",' + CRLF
+			cDados += '		"pedidoItem": "{|| alltrim(GetAdvFVal(' + "'SC6','C6_XIDTLC',xFilial('SC6')+SD2->(D2_PEDIDO+D2_ITEMPV),1" + '))}",' + CRLF
+			cDados += '		"peca": "{|| alltrim(SD2->D2_COD)}",' + CRLF
 			cDados += '		"quantidade": "{|| alltrim(cValToChar(SD2->D2_QUANT))}",' + CRLF
 			cDados += '		"preco": "{|| alltrim(cValToChar(SD2->D2_PRCVEN))}",' + CRLF
 			cDados += '		"baseIcms": "{|| alltrim(cValToChar(SD2->D2_BASEICM))}",' + CRLF
@@ -68,7 +68,7 @@ Default cTabelaFaturamento := 'SF2'
 			cDados += '		"aliquotaIpi": "{|| alltrim(cValToChar(SD2->D2_IPI))}",' + CRLF
 			cDados += '		"baseSubsTributaria": "{|| alltrim(cValToChar(if(SD2->D2_ICMSRET>0,SD2->D2_BASEICM,0)))}",' + CRLF
 			cDados += '		"valorSubsTributaria": "{|| alltrim(cValToChar(SD2->D2_ICMSRET))}",' + CRLF
-			cDados += '		"pecaPedida": "{|| SD2->D2_COD}"' + CRLF
+			cDados += '		"pecaPedida": "{|| alltrim(SD2->D2_COD)}"' + CRLF
 			cDados += '	},' + CRLF
 			cDados += '	"returnID": "{|| cValToChar(objRetorno['+ "'faturamento'" + '])}"' + CRLF
 			cDados += '}' + CRLF
@@ -79,9 +79,9 @@ Default cTabelaFaturamento := 'SF2'
 			// será gerado um envio por nota fiscal
 			// o json abaixo trata dos dados de uma nota fiscal
 			cDados := '{' + CRLF
-			cDados += '	"posto": "{|| GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + ')}",' + CRLF
-			cDados += '	"notaFiscal": "{|| SF2->F2_DOC}",' + CRLF
-			cDados += '	"serie": "{|| SF2->F2_SERIE}"' + CRLF
+			cDados += '	"posto": "{|| alltrim(GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + '))}",' + CRLF
+			cDados += '	"notaFiscal": "{|| alltrim(SF2->F2_DOC)}",' + CRLF
+			cDados += '	"serie": "{|| alltrim(SF2->F2_SERIE)}"' + CRLF
 			cDados += '}' + CRLF
 			MemoWrite(cArqCFG, cDados)
 			cDados := '' // limpa a variável para otimizar o uso de memória*/
@@ -235,7 +235,7 @@ default cRetorno := '{}'
 
 		// se conseguiu o retorno da API, informo o número do faturamento na nota fiscal
 		if lRet
-			TCSQLExec("UPDATE "+RetSQLName('SF2')+" SET F2_XIDTLC = '' WHERE D_E_L_E_T_ = ' ' AND F2_FILIAL = ' ' AND F2_DOC = ' ' AND F2_SERIE = ' '")
+//			TCSQLExec("UPDATE "+RetSQLName('SF2')+" SET F2_XIDTLC = '' WHERE D_E_L_E_T_ = ' ' AND F2_FILIAL = ' ' AND F2_DOC = ' ' AND F2_SERIE = ' '")
 		else
 			// preciso dar um jeito de enviar a informação em um momento posterior
 		endif
