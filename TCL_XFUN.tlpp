@@ -110,3 +110,33 @@ Local cStatus as character
 	cStatus += ';X=registro transmitido/recebido com sucesso'
 
 Return cStatus
+
+
+User Function TLCRETPOSTO(cNumNFs as character, cSerNFs as character)
+Local cRet := '' as character
+Local AreaSF2 := SF2->(GetArea()) as array
+Local AreaSA1 := SA1->(GetArea()) as array
+Local AreaSA2 := SA2->(GetArea()) as array
+Local cFilSF2 := xFilial('SF2') as character
+Local cFilSA1 := xFilial('SA1') as character
+Local cFilSA2 := xFilial('SA2') as character
+
+Default cNumNFs := SF2->F2_DOC
+Default cSerNFs := SF2->F2_SERIE
+
+	SF2->(dbSetOrder(1)) // F2_FILIAL, F2_DOC, F2_SERIE
+	if SF2->(dbSeek(cFilSF2 + cNumNFs + cSerNFs))
+		SA1->(dbSetOrder(1)) // A1_FILIAL, A1_COD, A1_LOJA
+		if SA1->(dbSeek(cFilSA1 + SF2->F2_CLIENTE + SF2->F2_LOJA))
+			SA2->(dbSetOrder(3)) // A2_FILIAL, A2_CGC
+			if SA2->(dbSeek(cFilSA2 + SA1->A1_CGC))
+				cRet := SA2->A1_COD + SA2->A2_LOJA
+			endif
+			SA2->(RestArea(AreaSA2))
+		endif
+		SA1->(RestArea(AreaSA1))
+	endif
+	SF2->(RestArea(AreaSF2))
+
+Return cRet
+

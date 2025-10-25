@@ -312,7 +312,7 @@ default cCodRet := '500'
 
 		::nRegistro := SB1->(Recno())
 		::oLOG:nRegistro := SB1->(Recno())
-		lRet := ::CallApi('put', @cCodRet, @cRetorno)
+		lRet := ::CallApi('put', @cCodRet, @cRetorno, SB1->B1_COD)
 	else
 		// LOG
 		if !IsBlind()

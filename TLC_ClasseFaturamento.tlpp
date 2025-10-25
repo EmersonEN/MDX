@@ -42,7 +42,7 @@ Default cTabelaFaturamento := 'SF2'
 			// será gerado um envio por nota fiscal
 			// o json abaixo trata dos dados de uma nota fiscal
 			cDados := '{' + CRLF
-			cDados += '	"posto": "{|| alltrim(GetAdvFVal(' + "'SA1','A1_CGC',xFilial('SA1')+SF2->(F2_CLIENTE+F2_LOJA),1" + '))}",' + CRLF
+			cDados += '	"posto": "{|| Telecontrol.Funcoes.U_TLCRETPOSTO()}",' + CRLF
 			cDados += '	"notaFiscal": "{|| alltrim(SF2->F2_DOC)}",' + CRLF
 			cDados += '	"serie": "{|| alltrim(SF2->F2_SERIE)}",' + CRLF
 			cDados += '	"emissao": "{|| left(FWTimeStamp(3, SF2->F2_EMISSAO),10)}",' + CRLF
